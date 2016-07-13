@@ -20,7 +20,8 @@ function doGetCaretPosition(oField) {
 }
 
 var Terminal = function(w,h,id, lines, cursor){
-	this.id 				= id;	
+	this.id 				= id;
+	this.name 				= id.replace("#","");
 	this.width 				= w;
 	this.height				= h;
 	this.stop 				= false;	
@@ -45,7 +46,7 @@ var Terminal = function(w,h,id, lines, cursor){
 		this.cursor = new Array(0,0,0); //X,Y
 		for(var i=0;i<h;i++){
 			radek = document.createElement("div");
-			radek.setAttribute("id", "line_"+i);
+			radek.setAttribute("id", this.name+"line_"+i);
 			radek.setAttribute("style", "height:17px;");
 			$(id).append(radek); 
 			this.lines[i] = new Array();
@@ -65,7 +66,7 @@ var Terminal = function(w,h,id, lines, cursor){
 		this.cursor = cursor; 
 		for(var i=0;i<h;i++){
 			radek = document.createElement("div");
-			radek.setAttribute("id", "line_"+i);
+			radek.setAttribute("id", this.name+"line_"+i);
 			radek.setAttribute("style", "height:17px;");
 			$(id).append(radek); 
 			if(typeof this.lines[i] == "undefined"){
@@ -96,7 +97,7 @@ var Terminal = function(w,h,id, lines, cursor){
 Terminal.prototype = {
 	redraw: function(stop){
 		for(var i=0;i<this.height;i++){
-			radek = $("#line_"+i);
+			radek = $("#"+this.name+"line_"+i);
 			write_ = "";
 			if(typeof this.width == "undefined"){ this.width = 0; }		
 			var	not=false;
@@ -176,6 +177,15 @@ Terminal.prototype = {
 			this.lines[i][a] = new Array("", "", "");
 		}
 		return this;
+	},
+	clear: function(){
+		this.cursor = new Array(0,0,0);
+		this.lines[i] = new Array();
+		for(var i=0;i<this.height;i++){
+			for(var a=0;a<this.width;a++){
+				this.lines[i][a] = new Array("", "", "");
+			}
+		}
 	},
 	clearLine: function(){
 		this.lines[this.cursor[1]] = new Array();

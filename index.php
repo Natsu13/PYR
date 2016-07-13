@@ -198,18 +198,22 @@ button {
 
 <div id="terminal" style="margin:0px;background:black;color:white;" onClick="$('#terminal_code').focus();"></div>
 <form action=# onSubmit="try{ terminal_execute(); }catch(Error){ errorCatcher(Error, 'Form'); }finally{ return false; }" style="height:0px;border: 0px;position:relative;top:-1px;">
-	<input type="text" autocomplete="off" style="width: 1px;height: 1px;border: 0px;padding: 0px;margin: 0px;background:transparent;color:transparent;" onFocus="terminal.youtype=true;" onBlur="if($(this).val()==''){ $(this).focus(); }else{ terminal.youtype=false; }" id="terminal_code" onKeyPress="terminal_type(this, this.value);" onKeyUp="terminal_type(this, this.value);return false;">
+	<input type="text" autocomplete="off" style="width: 1px;height: 1px;border: 0px;padding: 0px;margin: 0px;background:transparent;color:transparent;" onFocus="terminal.youtype=true;" onBlur="if($(this).val()=='' && lastTab == $('#devtab1')){ $(this).focus(); }else{ terminal.youtype=false; }" id="terminal_code" onKeyPress="terminal_type(this, this.value);" onKeyUp="terminal_type(this, this.value);return false;">
 </form>
 
 <div id="sourcecode">
 	<div style="padding: 7px;border-bottom: 1px solid silver;"><input type=text name=name id="fnam" value="main.pyr" width=200> <button id="runbutt" onClick="run();">RUN</button> <span id=infoprog style="padding: 10px;">ID vlákna: ...</span><br></div>
-	<textarea style="width:600px;height:211px;background:rgb(255, 255, 255);border:0px;outline: 0px;padding: 5px;" id="pyr_code">canvas = new Canvas();
+	<textarea style="width:600px;height:219px;background:rgb(255, 255, 255);border:0px;outline: 0px;padding: 5px;" id="pyr_code">canvas = new Canvas();
 a=0;
-while(a != 10){
-  a=a+1;
-  canvas.fillText("Hello World",10,20*a);
+while(a < 11){
+  a++;
+  if(a%2 == 0){
+    canvas.fillText("Hello World ("+a+")",10,20*a);
+  }else{
+    canvas.fillText("Lichý",10,20*a);
+  }
 }</textarea>
-	<div style="height: 158px;">
+	<div style="height: 150px;">
 		<div style="text-align: center; border-top: 1px solid silver;border-bottom: 1px solid silver;color: #424242;background: #F1F1F1;height: 10px;line-height: 2px;font-weight: bold;">...</div>
 		
 		<div style='height: 30px;float: left;border-bottom: 1px solid #007EFF;width: 96%;background: #f3f3f3;padding: 5px 12px;padding-bottom: 0px;'>
@@ -218,11 +222,14 @@ while(a != 10){
 			<div class=tab xx=7 id=devtab7>Output</div>
 		</div><div style='clear:both;'></div>
 		
-		<div style="overflow: auto;height: 111px;" id="message_pyr_area">
+		<div style="overflow: auto;height: 105px;" id="debugtab5">
 			<div class="info_msg">PYR debug line....</div>
 		</div>
-		<div style="overflow: auto;height: 111px;display:none;" id="variables_pyr_area">
+		<div style="overflow: auto;height: 105px;display:none;" id="debugtab6">
 			variables...
+		</div>
+		<div style="overflow: auto;height: 105px;display:none;" id="debugtab7">
+			<div id="terminal2" style="margin:0px;background:black;color:white;" onClick=""></div>
 		</div>
 	</div>
 </div>
@@ -268,10 +275,13 @@ function logit(text, clas){
 	}
 	if(!same){
 		if(typeof clas == "undefined") clas = "info_msg";
-		$("#message_pyr_area").append("<div class='"+clas+"' id='_msg_id_"+_last_message_added+"'><span class=repeat style='display:none;'></span><span class=text>"+text+"</span></div>");
-		$('#message_pyr_area').scrollTop($('#message_pyr_area')[0].scrollHeight);
+		$("#debugtab5").append("<div class='"+clas+"' id='_msg_id_"+_last_message_added+"'><span class=repeat style='display:none;'></span><span class=text>"+text+"</span></div>");
+		$('#debugtab5').scrollTop($('#debugtab5')[0].scrollHeight);
 	}
 }
+
+terminal2 = new Terminal(75, 6, "#terminal2");
+terminal2.redraw(true);
 
 terminal = new Terminal(75, 24, "#terminal");
 terminal.setColor("orange").write("PYR terminal build-in app").next().write("Copyright © 2014 - 2016 Wolfox corporation").setColor("white").next().write(">> ");
@@ -292,11 +302,16 @@ var _pyr_thread, _actual_thread = 0;
 function run(){
 	var vl = $("#runbutt").html();
 	if(vl == "RUN"){
-		_pyr_thread = new Pyr(terminal);
+		terminal2.clear();
+		_pyr_thread = new Pyr(terminal2);
 		$("#infoprog").html("ID vlákna: "+(_pyr_thread._thread_id));
 		_actual_thread = _pyr_thread._thread_id;
-		_pyr_thread.compile($("#pyr_code").val(),$("#fnam").val());
+		_pyr_state = _pyr_thread.compile($("#pyr_code").val(),$("#fnam").val());
 		$("#runbutt").html("STOP");
+		if(_pyr_thread.errorOcured){
+			logit("Program ended at "+((Math.floor((Date.now() - _pyr_thread.save_time_) / 10))/100)+"s with error", 'error_msg');
+			stoped();
+		}
 	}else{
 		$("#infoprog").html("ID vlákna: ...");
 		_pyr_thread._thread_stoped = true;
@@ -409,5 +424,23 @@ for(var xx = 1; xx <= 2; xx++){
 	});
 }
 $("#devtab2").click();
+
+var lastTab2 = $("#devtab5");
+var lastTar2 = $("#debugtab5");
+for(var xx = 5; xx <= 7; xx++){
+	$("#devtab"+xx).click(function(){
+		if( lastTab2 != $(this) ){
+			lastTab2.removeClass("selected_tab");
+			lastTab2.addClass("tab");
+			lastTab2 = $(this);
+			lastTab2.addClass("selected_tab");
+			lastTab2.removeClass("tab");
+			lastTar2.hide();
+			lastTar2 = $("#debugtab"+$(this).attr("xx"));
+			lastTar2.show();
+		}
+	});
+}
+
 setTimeout(function(){dialog.type = 1;dialog.Center(true);}, 500);
 </script>

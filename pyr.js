@@ -2,7 +2,7 @@
 //																						//
 // PYR VER 0.1 (JS)																		//
 // Create by Natsu (Jakub Teichmann)  													//
-// Last official chnanged: 21.06.2016													//
+// Last official chnanged: 13.07.2016													//
 //																						//
 // Tento program je svobodný software: můžete jej šířit a upravovat 					//
 // podle ustanovení Obecné veřejné licence GNU (GNU General Public Licence), 			//
@@ -16,6 +16,7 @@
 // Kopii Obecné veřejné licence GNU jste měli obdržet spolu s tímto programem. 			//
 // Pokud se tak nestalo, najdete ji zde: <http://www.gnu.org/licenses/>.				//
 //																						//
+// https://github.com/Natsu13/Pyr														//
 //////////////////////////////////////////////////////////////////////////////////////////
 navigator.sayswho= (function(){
     var ua= navigator.userAgent, tem,
@@ -32,6 +33,22 @@ navigator.sayswho= (function(){
     if((tem= ua.match(/version\/(\d+)/i))!= null) M.splice(1, 1, tem[1]);
     return M.join(' ');
 })();
+
+function isIn(text, array){
+	var open=false;
+	mam ="";
+	for(var i=0;i<text.length;i++){
+		c = text.charAt(i);
+		if(c == "\""){ open=!open; }
+		if(!open && c != "\"") mam+=c;
+	}
+	text = mam;
+	for (val of array) {
+		if(text.indexOf(val) > -1)
+			return true;
+	}
+	return false;
+}
 
 var thread = 0;
 
@@ -59,6 +76,9 @@ var Pyr = function(terminal){
 		
 		return dateCreator["null"]();
 	}
+	fnc["clear"] = function(vars){
+		this.id.terminal.clear();
+	}
 	fnc["ver"] = function(vars){
 		return dateCreator["float"]("0.4");
 	}
@@ -73,16 +93,18 @@ var Pyr = function(terminal){
 		this.id.throwError(getValue(vars[0]).toString(), 0, 0, "");
 		return dateCreator["null"]();
 	}
+	fnc["_id"] = function(vars){
+		return dateCreator["int"](vars[0].id);
+	}
 	//Variables
-	vars["true"]  = new dateCreator["int"]("1");
-	vars["false"] = new dateCreator["int"]("0");
-	vars["null"] = new dateCreator["null"]();
+	vars["true"]  	= new dateCreator["int"]("1");
+	vars["false"] 	= new dateCreator["int"]("0");
+	vars["null"] 	= new dateCreator["null"]();
 	
 	var _this = var_type();
 		_this.id = this;
 		_this.type = "object";
 		_this.func["_get"] = function(vars, global){
-			console.log(this.id.id.variables);
 			return "N00L";
 		}
 		_this.func["_string"] = function(vars, global){
@@ -98,7 +120,7 @@ var Pyr = function(terminal){
 				else
 					ret+=", \""+prop+"\" => "+val+"";
 			}
-			return "( "+ret+" )";
+			return "Array( "+ret+" )";
 		}
 		_this.func["_getitem"] = function(vars, global){  // [?]
 			vars[0] = getValue(vars[0]);
@@ -109,6 +131,8 @@ var Pyr = function(terminal){
 			return this.id.id.variables[vars[0]];
 		}
 	vars["this"] = _this;
+	
+	this.operators = new Array("==","!=",">","<",">=","<=","+","-","/","*","%","?");
 }
 var ErrorOcured=false;
 
@@ -129,8 +153,11 @@ Pyr.prototype = {
 			close_expresion_at = "",
 			save_expresion = "",
 			expresion_state = -1,
-			_time_ = 0,
-			ltype = "";
+			_time_ = Date.now(),
+			ltype = "",
+			openblock = 0;
+			
+		this.save_time_	= _time_;
 			
 		if(typeof poii == "undefined") poii = 0;
 		if(typeof si != "undefined") i = si;
@@ -142,8 +169,22 @@ Pyr.prototype = {
 			le = excode.substring(i,i+1);
 			mame = mam+le;
 			
-			if(close_expresion_at != "" && close_expresion_at != le && ptype != ""){
+			
+			/*
+			console.log(le+" - " +close_expresion_at);
+				if(close_expresion_at == "{" && le == "{"){
+					mam+="{";
+					openblock++;
+				}
+				else 
+			*/
+			if((close_expresion_at != "" && close_expresion_at != le && ptype != "") || (close_expresion_at == "}" && le == "{") || (close_expresion_at == "}" && le == "}" && openblock>0)){
 				mam+=le;
+				//console.log(close_expresion_at+", le: "+le+"("+openblock+")");
+				if(close_expresion_at == "}" && le == "{")
+					openblock++;
+				if(close_expresion_at == "}" && le == "}" && openblock>0)
+					openblock--;
 			}
 			else if(le == "\""){
 				open = !open;
@@ -170,6 +211,10 @@ Pyr.prototype = {
 					_thread_call_save_pos = 0;
 					_thread_call_agan = true;
 					i = excode.length;
+				}else if(mam == "jump"){
+					_thread_call_save_pos = mam.substr(exp[0].length+1);
+					_thread_call_agan = true;
+					i = excode.length;
 				}
 				mam = "";
 				type = "";
@@ -177,39 +222,46 @@ Pyr.prototype = {
 				radek++;
 				xa=1;
 			}else if(le == "}"){
-				if((expresion_state && ptype == "if") || (!expresion_state && ptype == "else") || (expresion_state && ptype == "while")){
-					//this.execute(mam, filename);
-					this.compile(mam,filename,0,radek);
-					
-					if(ptype == "while"){
-						var threa = 0;
-						var expresion = this.execute(save_expresion);
-						while(getValue(expresion, "int", this) == 1 && threa < 1000){
-							this.compile(mam,filename,0,radek);
-							expresion = this.execute(save_expresion);
-							console.log(getValue(this.execute("a;")),"int",this);
-							threa++;
-						}
-						if(threa == 1000) {
-							this.throwError("Loop: Never eneded loop!", radek+poii, xa, save_expresion);
-							i=excode.length;
-							break;
-						}
-					}
-					
-					close_expresion_at = "";
-					mam = "";
-					ltype = ptype;
-					ptype = "";
+				if(openblock > 0){
+					openblock--;
+					mam+="}";
 				}else{
-					close_expresion_at = "";
-					mam = "";
-					ptype = "";
+					if((expresion_state && ptype == "if") || (!expresion_state && ptype == "else") || (expresion_state && ptype == "while")){
+						//this.execute(mam, filename);
+						
+						if(ptype == "while"){
+							var threa = 0;
+							var expresion = this.execute(save_expresion);
+							console.log(mam);
+							while(getValue(expresion, "int", this) == 1 && threa < 1000){
+								this.compile(mam,filename,0,radek);
+								expresion = this.execute(save_expresion);
+								//console.log(getValue(this.execute("a;")),"int",this);
+								threa++;
+							}
+							if(threa == 1000) {
+								this.throwError("Loop: Never eneded loop!", radek+poii, xa, save_expresion);
+								i=excode.length;
+								break;
+							}
+						}else{
+							this.compile(mam,filename,0,radek);
+						}
+						
+						close_expresion_at = "";
+						mam = "";
+						ltype = ptype;
+						ptype = "";
+					}else{
+						close_expresion_at = "";
+						mam = "";
+						ptype = "";
+					}
+					/*
+					if(ptype == "else") { expresion_state = -1; ptype = ""; close_expresion_at = ""; }
+					if(ptype == "if") ptype = "else"; else ptype = "";
+					*/
 				}
-				/*
-				if(ptype == "else") { expresion_state = -1; ptype = ""; close_expresion_at = ""; }
-				if(ptype == "if") ptype = "else"; else ptype = "";
-				*/
 			}else if(le == "\n" || le == ";"){
 				if(mam != "" && le == "\n"){
 					if(ptype == ""){
@@ -280,9 +332,21 @@ Pyr.prototype = {
 					save_expresion = mam;
 					var expresion = this.execute(save_expresion);
 					
+					if(this.errorOcured){
+						this.throwError(getValue(expresion.vars["error"]), radek+poii, xa, save_expresion);
+						return expresion;
+					}
+					
 					save_line = i+1;
 					
-					if(getValue(expresion, "int", this) == 1){
+					executed = getValue(expresion, "int", this);
+					
+					if(this.errorOcured){
+						this.throwError(getValue(executed.vars["error"]), radek+poii, xa, save_expresion);
+						return executed;
+					}
+					
+					if(executed == 1){
 						expresion_state = true;
 					}else{
 						expresion_state = false;
@@ -297,15 +361,15 @@ Pyr.prototype = {
 				}
 			}else{
 				if((ptype == "if" || ptype == "else" || ptype == "while") && le == "{"){
-					close_expresion_at = "}";
-					
-					console.log(close_expresion_at);
-					
+					close_expresion_at = "}";					
 					mam = "";
 				}else if((ptype == "if" || ptype == "else" || ptype == "while") && le != " "){
 					close_expresion_at = "\n";
 					
-					console.log(close_expresion_at);
+					if(close_expresion_at == "\n")
+						console.log("[NEW LINE]");
+					else
+						console.log(close_expresion_at);
 					
 					mam+=le;
 				}else
@@ -313,9 +377,10 @@ Pyr.prototype = {
 			}
 			i++;
 			xa++;
-			_time_++;
+			//_time_++;
 			
 			if(this.errorOcured){
+				console.log(executed);
 				this.throwError((executed.func["type"]())+": "+getValue(executed.vars["error"]), 0, 0, "");
 			}
 		}
@@ -325,7 +390,7 @@ Pyr.prototype = {
 			setTimeout(function(){_this.compile(_code, _filename, _thread_call_save_pos);}, 1);
 		}else{
 			if(poii == 0){
-				logit("Program ended at "+(Math.round((_time_/99)*10)/10)+"s", 'info_msg');
+				logit("Program ended at "+((Math.floor((Date.now() - _time_) / 10))/100)+"s", 'info_msg');
 				setTimeout(function(){stoped();}, 1);
 			}
 		}
@@ -350,7 +415,6 @@ Pyr.prototype = {
 		args = new Array(),
 		argc = 0,
 		open = false,
-		excode = code,
 		varcom = "",
 		fullname = "",
 		savenamvar = "",
@@ -359,6 +423,7 @@ Pyr.prototype = {
 		nofucntionnow = false;
 		notBeVarButFunc = false,
 		myActionAft = "";
+		var excode = code;
 		if(typeof filename == "undefined") filename = "<console>";
 		if(typeof pline == "undefined") pline = 1;
 		
@@ -396,7 +461,11 @@ Pyr.prototype = {
 					mam="";
 					break;
 				}
-				mam+=le;
+				if(le == "\\" && excode.substring(i+1,i+2) != " "){
+					mam+="\\"+excode.substring(i+1,i+2);
+					i++;
+				}else
+					mam+=le;
 			}
 			else{
 				if((le == "=" || excode.substring(i,i+2) == "+=" || excode.substring(i,i+2) == "-=") && excode.substring(i,i+2) != "==" && excode.substring(i-1,i) !="!" && !nofucntionnow){
@@ -449,7 +518,7 @@ Pyr.prototype = {
 				}else if(le == "=" && excode.substring(i,i+2) == "=="){
 					mam+="==";i+=2;
 					continue;
-				}else if(le == "." && !nofucntionnow){
+				}else if(le == "." && !nofucntionnow && !isIn(mam, this.operators)){
 					if(this.getType(mam) == "int"){
 						mam+=".";
 					}else if(this.getType(mam) == "float"){
@@ -460,6 +529,8 @@ Pyr.prototype = {
 					}else{
 						if(!notBeVarButFunc){
 							canbeit = false;
+							
+							mam = mam.trim();
 							
 							if(varcom == ""){
 								locVariable = this.isVariable(mam, i, filename, excode, fullname);
@@ -531,7 +602,7 @@ Pyr.prototype = {
 							}
 						}else{
 							fullname = savenamvar;
-							if(typeof this.func[savenamvar] != "undefined"){	
+							if(typeof this.func[savenamvar] != "undefined"){
 								var getvrat = this.func[savenamvar](this.makeArgs(mam));
 								if(typeof getvrat != "undefined")
 									if(getvrat.type != "null")
@@ -568,12 +639,12 @@ Pyr.prototype = {
 					acttype = "";
 				}else if(le == ";" || i == excode.length-1){
 					if(i == excode.length-1 && le != ";"){ mam+=le; }
-					
 					if(acttype == "" && varcom != "" && mam == ""){
 						vrat = varcom;
 					}else if(acttype == "" && mam!=""){
-						if(mam.indexOf('-') > 0 || mam.indexOf('+') > 0 || mam.indexOf('/') > 0 || mam.indexOf('*') > 0 || mam.indexOf('%') > 0 || mam.indexOf('==') > 0 || mam.indexOf('!=') > 0){
-							if((le == '-' || le == '+' || le == '/' || le == '*' || le == '%' || le == "==" || le == "!=") && i == excode.length-1){
+						//if(mam.indexOf('-') > 0 || mam.indexOf('+') > 0 || mam.indexOf('/') > 0 || mam.indexOf('*') > 0 || mam.indexOf('%') > 0 || mam.indexOf('==') > 0 || mam.indexOf('!=') > 0 || mam.indexOf('>') > 0 || mam.indexOf('<') > 0){
+						if(isIn(mam, this.operators)){
+							if(isIn(le, this.operators) && i == excode.length-1){
 								this.errorOcured = true;
 								vrat = dateCreator["SyntaxError"]("unexpected EOF while parsing", pline, i, filename, excode);
 								mam="";
@@ -637,7 +708,6 @@ Pyr.prototype = {
 						vrat = null;
 						args[argc] = mam.trim();argc++;
 						mam = "";
-						
 						ret = this.priAction(acttype, args);
 						vrat = null;
 						if(this.errorOcured){
@@ -665,19 +735,191 @@ Pyr.prototype = {
 	mathCompile: function(text, filename){
 			var vstup = "",
 				vystup = text;
+				
+			//unary operstors
+			var unar_op = {
+				1: {
+					"++": ["_psinc", "_princ"],
+					"--": ["_psdec", "_prdec"],
+					"?" : ["_opnotsupp","_notnull"]
+				}
+			};
+			//binary operators
 			var operace = {
 				1: {
-					"*": "_mul",
-					"/": "_div",
-					"%": "_mod"
+					"*" : "_mul",
+					"/" : "_div",
+					"%" : "_mod"
 				},
 				2: {
-					"+": "_add",
-					"-": "_sub"
+					"+" : "_add",
+					"-" : "_sub"
 				},
 				3: {
 					"==": "_eq",
 					"!=": "_ine"
+				},
+				4: {
+					"<" : "_lt",
+					">" : "_gt"
+				}
+			}
+			
+			var alloperator = Array(),
+				alloperato_ = Array(),
+				allopsize = 0,
+				allopsiz_ = 0;
+			for (var key in unar_op) {
+				for (var act in unar_op[key]) {
+					alloperator[allopsize] = act;
+					allopsize++;
+				}
+			}
+			for (var key in operace) {
+				for (var act in operace[key]) {
+					alloperato_[allopsiz_] = act;
+					allopsiz_++;
+				}
+			}
+			
+			vstup = vystup.trim();
+			vystup = "";
+			
+			for (var key in unar_op) {				
+				var lastoperator = "",
+					actualchars = Array(),
+					acutalfunct = Array(),
+					buffer = "";
+				var pos = 0;
+				
+				for (var act in unar_op[key]) {
+					actualchars[pos] = act;
+					acutalfunct[pos] = unar_op[key][act];
+					pos++;
+				}
+			}
+			
+			var open = false;
+			buff = "";
+			for(var a = 0;a < vstup.length;a++){
+				var chr = vstup.substring(a,a+1);
+				if(chr == "\"" && open == false){
+					open = true;
+					buff+="\"";
+				}else if(chr == "\"" && open == true){
+					open = false;
+					buff+="\"";
+				}else if(open == true){
+					if(chr == "\\"){
+						a++;
+						chr = "\\"+vstup.substring(a,a+1)
+					}
+					buff+=chr;
+				}else if(chr != " "){
+					buff+=chr;
+				}
+			}
+			vstup = buff;
+			
+			var save_operator = "";
+			
+			var alloperator = Array(),
+				allopsize = 0;
+			for (var key in unar_op) {
+				for (var act in unar_op[key]) {
+					alloperator[allopsize] = act;
+					allopsize++;
+				}
+				
+				var buff = "",buffadd = "";
+				var open = false;
+				var fnc = "", snc = "";
+				
+				for(var a = 0;a < vstup.length;a++){
+					var chr = vstup.substring(a,a+1),
+						ch2 = vstup.substring(a,a+2);
+					
+					if(chr == "\"" && open == false){
+						open = true;
+						buff+="\"";
+					}else if(chr == "\"" && open == true){
+						open = false;
+						buff+="\"";
+						a++;
+						chr = vstup.substring(a,a+1);
+						ch2 = vstup.substring(a,a+2);
+					}else if(open == true){
+						if(chr == "\\"){
+							a++;
+							chr = "\\"+vstup.substring(a,a+1)
+						}
+						buff+=chr;
+					}
+					
+					//++1+1 ??????
+					var omam = false;
+					
+					if(open == false){
+						if((isIn(ch2,alloperato_) || isIn(chr,alloperato_)) && !isIn(chr,actualchars) && !isIn(ch2,actualchars)){							
+							if(snc != ""){
+								fnc = snc;
+								omam=true;
+								if(isIn(ch2,alloperato_)){
+									a++;
+									buffadd = ch2;
+								}else{
+									buffadd = chr;
+								}
+							}else{
+								//this.errorOcured = true;
+								//return dateCreator["SyntaxError"]("Unexpected identifier");
+								vystup+=buff;
+								buff = "";
+							}
+						}else{
+							for(var i = 0;i < pos;i++){
+								if(actualchars[i].length > 1)
+									chr = vstup.substring(a,a+actualchars[i].length);
+								else
+									chr = vstup.substring(a,a+1);
+								
+								if(chr == actualchars[i]){
+									save_operator = actualchars[i];
+									omam = true;
+									if(actualchars[i].length > 1)
+										a++;
+									
+									if(buff.trim()!=""){
+										fnc = acutalfunct[actualchars.indexOf(actualchars[i])][0];
+									}else{
+										snc = acutalfunct[actualchars.indexOf(actualchars[i])][1];
+									}
+								}
+							}
+							
+							chr = vstup.substring(a,a+1),
+							ch2 = vstup.substring(a,a+2);
+						}
+						
+						if(!omam){
+							buff+=chr;
+							if(a==vstup.length-1 && snc!=""){
+								fnc = snc;
+							}
+						}
+							
+						if(fnc != ""){
+							var num1, cislo1;
+							cislo1 = this.isVariable(buff);
+							var vysledek = cislo1.func[fnc](new Array(dateCreator["string"](save_operator)), this);
+							save_operator = "";
+							if(this.errorOcured){ return vysledek; }
+							vystup+=vysledek;
+							if(buffadd != "") vystup+=buffadd;
+							buffadd = "";
+							buff="";
+						}
+					}
 				}
 			}
 			
@@ -689,6 +931,9 @@ Pyr.prototype = {
 					allopsize++;
 				}
 			}
+			
+			if(buff != "") vystup+=buff;
+			if(vystup.trim() == "") vystup = vstup;
 
 			for (var key in operace) {
 				vstup = vystup.trim();
@@ -721,19 +966,21 @@ Pyr.prototype = {
 						buffer+="\"";
 					}else if(chr == "\"" && open == true){
 						open = false;
-						buffer+="\"";
-						a++;
-						chr = vstup.substring(a,a+1);
-						ch2 = vstup.substring(a,a+2);
+						if(a != vstup.length-1){
+							buffer+="\"";
+							a++;
+							chr = vstup.substring(a,a+1);
+							ch2 = vstup.substring(a,a+2);
+						}
 					}else if(open == true){
 						if(chr == "\\"){
 							a++;
-							chr = vstup.substring(a,a+1)
+							chr = "\\"+vstup.substring(a,a+1)
 						}
 						buffer+=chr;
 					}
 					
-					if(open == false){
+					if(open == false){						
 						for(var i = 0;i < pos;i++){
 							if(actualchars[i].length > 1)
 								chr = vstup.substring(a,a+actualchars[i].length);
@@ -744,8 +991,8 @@ Pyr.prototype = {
 								
 								pro = true;
 								
-								if(lastoperator != ""){
-									num2 = buff.trim();
+								if(lastoperator != ""){								
+									num2 = buffer.trim();
 									
 									if(this.getType(num1) == "variable" || this.getType(num1) == "list") { num1 = this.execute(num1, filename); }
 									if(this.errorOcured){ return num1; }
@@ -773,6 +1020,9 @@ Pyr.prototype = {
 									var vysledek = cislo1.func[fnc](argu, this);
 									if(this.errorOcured){ return vysledek; }
 									
+									if(type1 == "string" || type2 == "string")
+										vysledek="\""+vysledek+"\"";
+									
 									num1 = vysledek;
 								}else{
 									num1 = buffer.trim();
@@ -785,6 +1035,7 @@ Pyr.prototype = {
 						if(!pro)
 							chr = vstup.substring(a,a+1);
 						
+
 						if(!pro && (alloperator.indexOf(chr) > 0 || alloperator.indexOf(ch2) > 0 || a == vstup.length-1)){
 							if(alloperator.indexOf(ch2) > 0){
 								var operwi = alloperator[alloperator.indexOf(ch2)];
@@ -818,7 +1069,7 @@ Pyr.prototype = {
 									
 								cislo1 = dateCreator[type1](num1, this);
 								cislo2 = dateCreator[type2](num2, this);
-									
+								
 								fnc = acutalfunct[actualchars.indexOf(lastoperator)];
 												
 								var argu = new Array();
@@ -842,7 +1093,9 @@ Pyr.prototype = {
 						}
 					}
 				}
+				
 				if(num1 != "") vystup+=num1;
+				if(buffer != "" && vystup == "") vystup = buffer;
 			}
 		return vystup;
 	},
@@ -878,7 +1131,6 @@ Pyr.prototype = {
 			
 			if(typeof args[0] == "object"){
 				args[2] = this.execute(args[2]);
-				//args[0].vars[args[1]] = args[2];
 				args[0].func["_set"](new Array(args[1], args[2]), this);
 				
 				if(this.errorOcured)
@@ -921,11 +1173,19 @@ Pyr.prototype = {
 			
 			var mam = args[1];
 			args[1] = this.execute(args[1]);
+			
+			if(this.errorOcured){
+				return args[1];
+			}
+			
 			if(typeof args[1] == "object"){
 				this.variables[args[0]] = args[1];
 				return true;
 			}
+
 			ntype = this.getType(args[1]);
+			console.log(args[1]);
+			console.log(ntype);
 			if(ntype == "int")
 				this.variables[args[0]] = new dateCreator["int"](args[1]);
 			else if(ntype == "float")
@@ -963,7 +1223,7 @@ Pyr.prototype = {
 		
 	},
 	isVariable: function(mam, i, filename, excode){
-		var typet = this.getType(mam);
+		var typet = this.getType(mam);		
 		if(typet == "list" && mam.substr(0,1) != "[") typet = "variable";
 		if(typet != "variable"){
 			vrat = new dateCreator[this.getType(mam)](mam, this);
@@ -1073,7 +1333,7 @@ Pyr.prototype = {
 			return "";
 	},
 	makeArgs: function(args){
-		mam  = "";
+		var mam  = "";
 		open = false;
 		var vars = new Array();
 		
@@ -1084,7 +1344,20 @@ Pyr.prototype = {
 				open = false;
 				mam = mam.trim();
 				if(i == args.length-1){
-					vars[vars.length] = mam+"\"";
+					if(mam.indexOf("\"") > -1){
+						mam+="\"";
+					}
+					var ex = this.execute(mam);
+					
+					if(typeof ex == "object"){
+						var vx = getValue(ex);
+						if(ex.type == "string")
+							vars[vars.length] = "\""+getValue(ex)+"\"";
+						else
+							vars[vars.length] = getValue(ex);
+					}else{
+						vars[vars.length] = "\""+ex+"\"";
+					}
 				}else mam+="\"";
 			}
 			else if(open){				
@@ -1098,10 +1371,18 @@ Pyr.prototype = {
 					if(i == args.length-1)
 						mam+=le;
 					mam = mam.trim();
-					if(this.getType(mam) == "string")
-						vars[vars.length] = mam;
-					else
-						vars[vars.length] = getValue(this.execute(mam));
+					
+					var ex = this.execute(mam);
+					
+					if(typeof ex == "object"){
+						var vx = getValue(ex);
+						if(ex.type == "string")
+							vars[vars.length] = "\""+getValue(ex)+"\"";
+						else
+							vars[vars.length] = getValue(ex);
+					}else
+						vars[vars.length] = "\""+ex+"\"";
+					
 					mam="";
 				}else{
 					mam+=le;
@@ -1248,12 +1529,19 @@ function var_type(){
 	var_Tobject.func["_delattr"] 	= function(vars, global){ }; 
 	
 	var_Tobject.func["_len"] 		= function(vars, global){ };
-	var_Tobject.func["_getitem"] 	= function(vars, global){ global.errorOcured = true;return dateCreator["TypeError"]("'"+this.id.type+"' class does not support items"); }; // []
-	var_Tobject.func["_setitem"] 	= function(vars, global){ global.errorOcured = true;return dateCreator["TypeError"]("'"+this.id.type+"' class does not support item assignment"); }; // [] =
+	var_Tobject.func["_getitem"] 	= function(vars, global){ global.errorOcured = true;return dateCreator["IndexError"]("'"+this.id.type+"' class does not support items"); }; // []
+	var_Tobject.func["_setitem"] 	= function(vars, global){ global.errorOcured = true;return dateCreator["IndexError"]("'"+this.id.type+"' class does not support item assignment"); }; // [] =
 	var_Tobject.func["_delitem"] 	= function(vars, global){ };
 	var_Tobject.func["_contains"] 	= function(vars, global){ }; // kolo in auto
 	var_Tobject.func["_missing"] 	= function(vars, global){ }; // kolo not in auto
 	var_Tobject.func["_call"] 		= function(vars, global){ };
+	
+	var_Tobject.func["_psinc"] 		= function(vars, global){ global.errorOcured = true;return dateCreator["UnsuportedOperator"]("Postfix operator ++ is not supported in '"+this.id.type+"' class"); }; //  a++
+	var_Tobject.func["_psdec"] 		= function(vars, global){ global.errorOcured = true;return dateCreator["UnsuportedOperator"]("Postfix operator -- is not supported in '"+this.id.type+"' class"); }; //  a--
+	var_Tobject.func["_princ"] 		= function(vars, global){ global.errorOcured = true;return dateCreator["UnsuportedOperator"]("Prefix operator ++ is not supported in '"+this.id.type+"' class"); }; //  ++a
+	var_Tobject.func["_prdec"] 		= function(vars, global){ global.errorOcured = true;return dateCreator["UnsuportedOperator"]("Prefix operator -- is not supported in '"+this.id.type+"' class"); }; //  --a
+	var_Tobject.func["_notnull"] 	= function(vars, global){ global.errorOcured = true;return dateCreator["UnsuportedOperator"]("Prefix operator ? is not supported in '"+this.id.type+"' class"); }; //  ?a
+	var_Tobject.func["_opnotsupp"] 	= function(vars, global){ global.errorOcured = true;return dateCreator["UnsuportedOperator"]("Operator "+getValue(vars[0])+" is not supported in '"+this.id.type+"' class"); }; // Unsuported Operator
 	
 	var_Tobject.func["_get"] 		= function(vars, global){ }; // Delete maybe...
 	var_Tobject.func["_set"] 		= function(vars, global){ this.id.vars[vars[0]] = vars[1]; }; // Update value
@@ -1329,6 +1617,30 @@ function var_type_int(){
 		else
 			return 0;
 	}
+	var_Tint.func["_lt"] = function(vars, global){  // <
+		if(parseInt(this.id.vars["value"].value) < getValue(getFunct(vars[0], "_"+this.id.type, new Array(), global),"int"))
+			return 1;
+		else
+			return 0;
+	}
+	var_Tint.func["_gt"] = function(vars, global){  // >
+		if(parseInt(this.id.vars["value"].value) > getValue(getFunct(vars[0], "_"+this.id.type, new Array(), global),"int"))
+			return 1;
+		else
+			return 0;
+	}
+	var_Tint.func["_psinc"] = function(vars, global){  // a++
+		var ret = this.id.vars["value"].value;
+		this.id.vars["value"]  = new PValue(parseInt(this.id.vars["value"].value+1));
+		return ret;
+	}
+	var_Tint.func["_princ"] = function(vars, global){  // ++a
+		this.id.vars["value"]  = new PValue(parseInt(this.id.vars["value"].value+1));
+		return this.id.vars["value"].value;
+	}
+	var_Tint.func["_notnull"] = function(vars, global){  // ?a
+		return (this.id.vars["value"].value != 0?1:0);
+	}
 		
 	return var_Tint;
 }
@@ -1377,6 +1689,9 @@ function var_type_float(){
 	var_Tfloat.func["_mod"] = function(vars, global){  // %
 		return parseFloat(this.id.vars["value"].value) % getValue(getFunct(vars[0], "_"+this.id.type, new Array(), global));
 	}
+	var_Tfloat.func["_notnull"] = function(vars, global){  // ?a
+		return (this.id.vars["value"].value != 0?1:0);
+	}
 		
 	return var_Tfloat;
 }
@@ -1389,22 +1704,32 @@ function var_type_null(){
 		this.id.vars["value"]  = new PValue("null");
 	}
 	var_Tnull.func["_int"] = function(vars, global){
-		return new PValue(0);
+		//return new PValue(0);
+		return dateCreator["int"]("0");
 	}
 	var_Tnull.func["_string"] = function(vars, global){
 		return new PValue("null");
 	}
 	var_Tnull.func["_eq"] = function(vars, global){  // ==
-		if(this.id.type == vars[0].type || getValue(getFunct(vars[0], "_int", new Array(), global),"int") == 0)
+		var intr = getFunct(vars[0], "_int", new Array(), global);
+		if(global.errorOcured){ global.errorOcured = false; return 0; }
+		
+		if(this.id.type == vars[0].type || getValue(intr,"int") == 0)
 			return 1;
 		else
 			return 0;
 	}
 	var_Tnull.func["_ine"] = function(vars, global){  // !=
-		if(this.id.type != vars[0].type && getValue(getFunct(vars[0], "_int", new Array(), global),"int") != 0)
+		var intr = getFunct(vars[0], "_int", new Array(), global);
+		if(global.errorOcured){ global.errorOcured = false; return 0; }
+		
+		if(this.id.type != vars[0].type && getValue(intr,"int") != 0)
 			return 1;
 		else
 			return 0;
+	}
+	var_Tnull.func["_notnull"] = function(vars, global){  // ?a
+		return 0;
 	}
 	
 	return var_Tnull;
@@ -1415,8 +1740,10 @@ function var_type_string(){
 	var_Tstring.type = "string";
 	
 	var_Tstring.func["_init"] = function(vars, global){
-		var value = (getValue(vars[0])+"").trim();
+		var vl = getValue(vars[0]);
+		var value = (vl+"").trim();
 		if(value == "") value = getValue(vars[0]);
+		else value = vl+"";
 		
 		if(value.substring(0,1) == '"' && value.substring(value.length-1,value.length) == '"') value=value.substring(1,value.length-1);
 		
@@ -1475,7 +1802,7 @@ function var_type_string(){
 		return "\""+this.id.vars["value"].value+"\"";
 	}
 	
-	var_Tstring.func["_add"] = function(vars, global){  // +
+	var_Tstring.func["_add"] = function(vars, global){  // +		
 		var secondVal = getFunct(vars[0], "_"+this.id.type, new Array(), global);
 		if(global.errorOcured) return secondVal;
 		return this.id.vars["value"].value+""+getValue(secondVal);
@@ -1493,6 +1820,43 @@ function var_type_string(){
 		var char1 = getValue(vars[0]);
 		var char2 = getValue(vars[1]);
 		return global.createVar("\""+this.id.vars["value"].value.replace(char1,char2)+"\"");
+	}
+	var_Tstring.func["_getitem"] = function(vars, global){
+		var chars = parseInt(getValue(vars[0]));
+		return global.createVar("\""+this.id.vars["value"].value.charAt(chars)+"\"");
+	}
+	var_Tstring.func["_eq"] = function(vars, global){  // ==
+		var intr = getFunct(vars[0], "_string", new Array(), global);
+		if(global.errorOcured){ return intr; }
+		
+		if(getValue(intr,"string") == this.id.vars["value"].value)
+			return 1;
+		else
+			return 0;
+	}
+	var_Tstring.func["_ine"] = function(vars, global){  // !=
+		var intr = getFunct(vars[0], "_string", new Array(), global);
+		if(global.errorOcured){ return intr; }
+		
+		if(getValue(intr,"string") != this.id.vars["value"].value)
+			return 1;
+		else
+			return 0;
+	}
+	var_Tstring.func["_lt"] = function(vars, global){  // <
+		if(this.id.vars["value"].value.length < getValue(getFunct(vars[0], "_"+this.id.type, new Array(), global),"string").length)
+			return 1;
+		else
+			return 0;
+	}
+	var_Tstring.func["_gt"] = function(vars, global){  // >
+		if(this.id.vars["value"].value.length > getValue(getFunct(vars[0], "_"+this.id.type, new Array(), global),"string").length)
+			return 1;
+		else
+			return 0;
+	}
+	var_Tstring.func["_notnull"] = function(vars, global){  // ?a
+		return (this.id.vars["value"].value != ""?1:0);
 	}
 	
 	return var_Tstring;
@@ -1532,7 +1896,7 @@ function var_type_list(){
 		}
 		return parseInt(this.id.vars["value"].value) * getValue(getFunct(vars[0], "_"+this.id.type, new Array(), global));
 	}
-	var_Tlist.func["_add"] = function(vars, global){  // +
+	var_Tlist.func["_add"] = function(vars, global){  // +=
 		return parseInt(this.id.vars["value"].value) + getValue(getFunct(vars[0], "_"+this.id.type, new Array(), global));
 	}
 	var_Tlist.func["add"] = function(vars, global){  // add object to next position
@@ -1549,6 +1913,14 @@ function var_type_list(){
 		}
 		this.id.vars[vars[1]] = vars[0];
 		return true;
+	}
+	var_Tlist.func["_getitem"] = function(vars, global){
+		var index = getValue(vars[0]);
+		if(typeof this.id.vars[index] == "undefined"){
+			global.errorOcured = true;
+			return dateCreator["IndexError"]("index '"+index+"' is out of range");
+		}
+		return this.id.vars[index];
 	}
 		
 	return var_Tlist;
@@ -1608,23 +1980,27 @@ function getValue(vars, type, global){
 			if(typeof vars.vars["value"] != "undefined"){
 				if(typeof vars.vars["value"].value != "undefined"){
 					var vl = ""+vars.vars["value"].value, noS = false, nvl = "";
-					for(i=0;i<vl.length;i++){ zn = vl.charAt(i); if(zn == "\\"){noS = true;}else if(zn == "\"" && noS == false){ }else{ nvl+=zn; } }
+					for(i=0;i<vl.length;i++){ zn = vl.charAt(i);zq = vl.charAt(i+1); if(zn == "\\" && zq != "n" && zq != "r"){noS = true;}else if(zn == "\"" && noS == false){ }else{ nvl+=zn; } }
 					_return = nvl;
 				}
 			}else if(typeof vars.func[jak] != "undefined"){
-				_return = vars.func[jak]();
+				_return = vars.func[jak](new Array(), global);
 			}
 		}else if(typeof vars.func == "undefined"){
 			if(typeof vars.value != "undefined")
 				_return = getValue(dateCreator[type](vars.value));			
 		}else if(typeof vars.func[jak] != "undefined"){
 			if(type == "string"){
-				_return = vars.func[jak]();
+				_return = vars.func[jak](new Array(), global);
 			}
-			_return = vars.func[jak]();
+			_return = vars.func[jak](new Array(), global);
 		}
 	}
-	if(typeof _return == "object") return getValue(_return, type);
+	if(typeof _return == "object"){
+		if(typeof _return.isError != "undefined")
+			return _return;
+		return getValue(_return, type, global);
+	}
 	if(type == "int") _return = parseInt(_return);
 	if(type == "float") _return = parseFloat(_return);
 	return _return;
@@ -1656,11 +2032,15 @@ function getType(text){
 			}else if(le == "." && bots == 0){
 				type = "float";
 				bots++;
-			}else{
+			}else if(type != "string"){
 				onlynumber = false;
 				type = "variable";
 			}
-		}			
+		}else{
+			if(le == " "){
+				type = "string";
+			}
+		}
 			
 		i+=1;
 	}
@@ -1743,6 +2123,7 @@ dateType["Canvas"] = function(){
 	}
 	//fillText("Hello World",10,50);
 	var_Tcanvas.func["fillText"] = function(vars, global){
+		console.log(vars);
 		this.id.vars["canvas"].fillText(getValue(vars[0]),getValue(vars[1]),getValue(vars[2]));
 		return;
 	}
@@ -1767,6 +2148,7 @@ dateCreator["Canvas"] 	= function(value, global){ 	var vars = dateType["Canvas"]
 function var_type_Error(type){
 	var var_TSyntaxError = var_type();
 	var_TSyntaxError.type = type;
+	var_TSyntaxError.isError = true;
 	
 	var_TSyntaxError.func["_init"] = function(vars, global){
 		error 	= getValue(vars[0]);
