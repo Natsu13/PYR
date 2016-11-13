@@ -102,11 +102,15 @@ Terminal.prototype = {
 			if(typeof this.width == "undefined"){ this.width = 0; }		
 			var	not=false;
 			for(var a=0;a<this.width;a++){		
-				try{ letter = this.lines[i][a]; }catch(e){ leter = new Array("","","");not=true;break; }				
-				p = letter[0];
+				try{ letter = this.lines[i][a]; }catch(e){ leter = new Array("","","");not=true;break; }
+				
+				if(letter[0].trim() == ""){ p = "&nbsp;"; }
+				else if(letter[0].trim() == "<"){ p = "&lt;"; }
+				else if(letter[0].trim() == ">"){ p = "&gt;"; }
+				else{ p = letter[0]; }
+				
 				if(this.cursor[0] == a && this.cursor[1] == i && this.youtype){ 
 					if(this.cursor[2] == 1){
-						if(letter[0].trim() == ""){ p = "&nbsp;"; }
 						p = "<span style='background-color:#0F0;color:black;'>"+p+"</span>";
 						this.cursor[2] = 0;
 					}else{ this.cursor[2] = 1; }
@@ -137,21 +141,19 @@ Terminal.prototype = {
 			if(text[i] == "\\" && text[i+1]=="n"){
 				this.next();
 				i++;
-			}else{
-			
-			this.lines[this.cursor[1]][this.cursor[0]][0] = text[i];
-			this.lines[this.cursor[1]][this.cursor[0]][1] = this.foregroundColor;
-			this.lines[this.cursor[1]][this.cursor[0]][2] = this.backgroundColor;
-			this.cursor[0]++;
-			if(this.cursor[0] >= this.width){ 
-				this.cursor[0] = 0;this.cursor[1]++; 
-				if(this.cursor[1] > this.height - 1){	
-					this.posun();					
-					this.redraw(true);
-					this.cursor[1]--;
-				}
-			}
-			
+			}else{		
+				this.lines[this.cursor[1]][this.cursor[0]][0] = text[i];
+				this.lines[this.cursor[1]][this.cursor[0]][1] = this.foregroundColor;
+				this.lines[this.cursor[1]][this.cursor[0]][2] = this.backgroundColor;
+				this.cursor[0]++;
+				if(this.cursor[0] >= this.width){ 
+					this.cursor[0] = 0;this.cursor[1]++; 
+					if(this.cursor[1] > this.height - 1){	
+						this.posun();					
+						this.redraw(true);
+						this.cursor[1]--;
+					}
+				}	
 			}
 		}
 		return this;		
@@ -328,7 +330,7 @@ Dialog.prototype = {
 		parent.Center();
 	},
 	getButtons: function(){
-		return this.html.footer.find(".button");
+		return this.html.footer.find(".buttonInWin");
 	},
 	setButtons: function(buttons){
 		if(typeof this.html.buttons != "undefined"){			
@@ -355,7 +357,9 @@ Dialog.prototype = {
 		    for(i=0;i<buttons.length;i++){
 				butt = $("<"+buttons[i].type+">");
 				butt.addClass(buttons[i].className);
-				butt.addClass("button");
+				if(buttons[i].type != "button")
+					butt.addClass("button");
+				butt.addClass("buttonInWin");					
 				butt.html(buttons[i].title);
 				butt.attr("name", buttons[i].name);
 				this.html.buttons.append(butt);
@@ -454,7 +458,7 @@ Dialog.prototype = {
 	Close: function(){
 		var parent = this;
 		if(this._ClickOutsideCl){
-			this.html.dialog.fadeOut("fast", function(){ parent.html.background.remove(); });
+			this.html.dialog.fadeOut("fast", function(){ parent.html.background.remove();parent.html.dialog.remove(); });
 		}		
 		if(Dialog._WINDOWS == 1)
 			$("body").css("overflow", "auto");
