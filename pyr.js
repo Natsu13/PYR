@@ -126,6 +126,7 @@ var Pyr = function(terminal){
 	var _this = var_type();
 		_this.id = this;
 		_this.type = "object";
+		_this.name = "this";
 		_this.func["_get"] = function(vars, global){
 			return "N00L";
 		}
@@ -134,15 +135,17 @@ var Pyr = function(terminal){
 			for (var prop in this.id.id.variables) {
 				if(prop == "id" || prop == "this") continue;
 				
-				val = getValue(this.id.id.variables[prop]);
+				if(this.id.id.variables[prop].name == "this") val = "##this";
+				else val = getValue(this.id.id.variables[prop]);
+				
 				if(this.id.id.variables[prop].type == "string") val = "\""+val+"\"";
 				
 				if(ret == "")
-					ret+="\""+prop+"\" => "+val+"";
+					ret+="\""+prop+"\": "+val+"";
 				else
-					ret+=", \""+prop+"\" => "+val+"";
+					ret+=", \""+prop+"\": "+val+"";
 			}
-			return "Array( "+ret+" )";
+			return "{"+ret+"}";
 		}
 		_this.func["_getitem"] = function(vars, global){  // [?]
 			vars[0] = getValue(vars[0]);
@@ -422,7 +425,6 @@ Pyr.prototype = {
 				if(_local_data.type == "return"){
 					_local_data.mam=_local_data.mam.trim();
 					_local_data.return_object = this.execute(_local_data.mam);
-					console.log(_local_data.return_object);
 					_local_data.i = excode.length;
 					_local_data.mam = "";
 					_local_data.type = "";
@@ -883,8 +885,13 @@ Pyr.prototype = {
 							fullname = savenamvar;
 							var locVariable = this.isVariable(savenamvar, i, filename, excode, fullname);
 							if(typeof this.func[savenamvar] != "undefined"){
+								console.log(mam);
+								
 								var __savenamvar = savenamvar;
 								var ex = this.makeArgs(mam);
+								
+								console.log(ex);
+								
 								if(this.errorOcured) return ex;
 								savenamvar = __savenamvar;
 								var getvrat = this.func[savenamvar](ex);
@@ -1486,7 +1493,7 @@ Pyr.prototype = {
 			}
 			this.subacttype = "";
 			
-			if(typeof args[0] == "object"){
+			if(typeof args[0] == "object"){				
 				args[2] = this.execute(args[2]);
 				args[0].func["_set"](new Array(args[1], args[2]), this);
 				
@@ -2310,16 +2317,16 @@ function var_type_dictionary(){
 	var_Tdictionary.func["_init"] = function(vars, global){
 		if(vars.length == 1)
 			vars = global.makeArgs(vars[0].substring(1,vars[0].length-1), true);
-		for(i=0;i<vars.length;i++){
+		for(var i=0;i<vars.length;i++){
 			var vl = getValue(vars[i]);
 			var name = "";
-			for(var i = 0; i < vl.length; i++){
-				var chr = vl.charAt(i);
+			for(var q = 0; q < vl.length; q++){
+				var chr = vl.charAt(q);
 				if(chr == ":") break;
 				name+=chr;
 			}
-			i++;
-			this.id.vars[getValue(global.execute(name.trim()))] = global.execute(vl.substr(i).trim());
+			q++;
+			this.id.vars[getValue(global.execute(name.trim()))] = global.execute(vl.substr(q).trim());
 		}
 		this.id.vars["length"] = dateCreator["int"](vars.length);
 	}
@@ -2577,7 +2584,7 @@ function getValue(vars, type, global){
 					_return = nvl;
 				}
 			}else if(typeof vars.func[jak] != "undefined"){
-				_return = vars.func[jak](new Array(), global);
+				_return = vars.func[jak](new Array(), global);				
 			}
 		}else if(typeof vars.func == "undefined"){
 			if(typeof vars.value != "undefined")
