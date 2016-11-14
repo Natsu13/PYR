@@ -332,8 +332,18 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 
 #terminal {background-color:black;color:white;font-family:courier,fixed,swiss,monospace,sans-serif;font-size:14px;}
 #terminal2 {background-color:black;color:white;font-family:courier,fixed,swiss,monospace,sans-serif;font-size:14px;}
-</style>
 
+.inside_whatewer {overflow: hidden;}
+</style>
+<link rel="stylesheet" href="./codemirror/base16-dark.css">
+<link rel="stylesheet" href="./codemirror/codemirror.css">
+<link rel="stylesheet" href="./codemirror/addon/hint/show-hint.css">
+<script src="./codemirror/codemirror.js"></script>
+<script src="./codemirror/python/python.js"></script>
+<script src="./codemirror/addon/selection/active-line.js"></script>
+<script src="./codemirror/addon/edit/matchbrackets.js"></script>
+<script src="./codemirror/addon/hint/show-hint.js"></script>
+<script src="./codemirror/addon/hint/html-hint.js"></script>
 <body>
 	<div style="background: #191919;">
 		<div style="position:absolute;bottom: 10px;left: 10px;background:white;width: 241px;">
@@ -432,9 +442,18 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 			<div style="clear:both"></div>
 		</div>
 	</div>
-	<div id="template_text_editor" style="display:none;"><textarea onKeyUp="files[actual_file] = $(this).val();" style="width:100%;height:100%;background-color:black;"></textarea></div>
+	<div id="template_text_editor" style="display:none;">
+			<textarea onKeyUp="files[actual_file] = $(this).val();" id="code" name="code" style="width:100%;height:100%;background-color:black;"></textarea>
+	</div>
 	<div id="template_blank_page"  style="display:none;"><div style="font-size: 57px;color: #1d1d1d;text-align: center;padding-top: 69px;">Blank page</div></div>
 	<script>
+	var editor = CodeMirror.fromTextArea(document.getElementById("code"), {
+		lineNumbers: true,
+		styleActiveLine: true,
+		matchBrackets: true,
+		theme: "base16-dark"
+	  });
+  
 	terminal = new Terminal(95, 8, "#terminal2");
 	terminal.write(">> ");
 	function terminal_type(id, value){
@@ -684,6 +703,40 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 	var last_showed_page = $("#blank_page");
 	var actual_file = "";
 	var files = new Array();
+	var editors = new Array();
+	
+	var comp = [
+		["here", "hither"],
+		["asynchronous", "nonsynchronous"],
+		["completion", "achievement", "conclusion", "culmination", "expirations"],
+		["hinting", "advive", "broach", "imply"],
+		["function","action"],
+		["provide", "add", "bring", "give"],
+		["synonyms", "equivalents"],
+		["words", "token"],
+		["each", "every"],
+		["return"],
+		["repeat"]
+	  ]
+	
+	function hintCode(cm, option) {
+		return new Promise(function(accept) {
+		  setTimeout(function() {
+			var cursor = cm.getCursor(), line = cm.getLine(cursor.line)
+			var start = cursor.ch, end = cursor.ch
+			while (start && /\w/.test(line.charAt(start - 1))) --start
+			while (end < line.length && /\w/.test(line.charAt(end))) ++end
+			var word = line.slice(start, end).toLowerCase()
+			var lis = new Array();
+			for (var i = 0; i < comp.length; i++){ if(comp[i][0].substr(0, end - start) == word){ lis.push(comp[i][0]); } }
+			console.log(lis);
+			if(lis.length != 0)
+				return accept({list: lis, from: CodeMirror.Pos(cursor.line, start), to: CodeMirror.Pos(cursor.line, end)})
+			else
+				return accept({list: new Array("No suggestion")})
+		  }, 100)
+		})
+	  }
 	
 	function _project_files_draw(object, id, cat){
 		var i=0;
@@ -717,6 +770,7 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 						id = $("#page_"+$(this).attr("id"));
 						if(exc == "pyr"){
 							id.find("textarea").val(files[$(this).attr("data-name")]);
+							
 						}
 					}else{
 						id = $("<div></div>");
@@ -725,6 +779,24 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 						if(exc == "pyr"){
 							id.html($("#template_text_editor").html());
 							id.find("textarea").val(files[$(this).attr("data-name")]);
+							
+							editors[$(this).attr("data-name")] = CodeMirror.fromTextArea(id.find("textarea")[0], {
+								lineNumbers: true,
+								styleActiveLine: true,
+								matchBrackets: true,
+								mode: "python",
+								theme: "base16-dark",
+								extraKeys: {"Ctrl-Space": "autocomplete"},
+								hintOptions: {hint: hintCode}
+							  });
+							var that = editors[$(this).attr("data-name")];
+							that.on('change', function () {
+								html = that.getValue();
+								files[actual_file] = html;
+							});
+							setTimeout(function() {
+								that.refresh();
+							},1);
 						}else{
 							id.html($("#template_blank_page").html());
 						}

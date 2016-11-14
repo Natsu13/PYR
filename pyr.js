@@ -378,6 +378,10 @@ Pyr.prototype = {
 							var erro__ = this.compile(_local_data.mam,_fileName,0,radek,true);
 							if(returnError && this.errorOcured)
 									return erro__;
+							else if(erro__ != "" && erro__ != null){
+								_local_data.return_object = erro__;
+								_local_data.i = excode.length;
+							}
 						}
 						
 						_local_data.close_expresion_at = "";
@@ -393,8 +397,9 @@ Pyr.prototype = {
 							break;
 						}
 					}else{
-						_local_data.close_expresion_at = "";
-						_local_data.mam = "";
+						_local_data.close_expresion_at = "";						
+						_local_data.mam+="}";
+						//_local_data.mam = "";
 						_local_data.ptype = "";
 					}
 					/*
@@ -416,8 +421,11 @@ Pyr.prototype = {
 				}
 				if(_local_data.type == "return"){
 					_local_data.mam=_local_data.mam.trim();
-					_local_data.return_object = this.isVariable(_local_data.mam);
+					_local_data.return_object = this.execute(_local_data.mam);
+					console.log(_local_data.return_object);
 					_local_data.i = excode.length;
+					_local_data.mam = "";
+					_local_data.type = "";
 				}
 				else if(_local_data.type == "import"){
 					_local_data.mam=_local_data.mam.trim();
@@ -492,7 +500,13 @@ Pyr.prototype = {
 									return executed;
 								}
 								this.throwError((executed.func["type"]())+": "+getValue(executed.vars["error"]), radek+poii, xa, _local_data.mam, _fileName);
+							}else if(executed != "" && executed != null){
+								//_local_data.return_object = executed;
+								//_local_data.i = excode.length;
 							}
+						}else if(executed != "" && executed != null){
+							//_local_data.return_object = executed;
+							//_local_data.i = excode.length;
 						}
 					}
 				}
@@ -734,7 +748,7 @@ Pyr.prototype = {
 					}else{
 						this.subacttype = "=";
 					}
-					mam = mam.trim();					
+					mam = mam.trim();
 					
 					if(varcom != ""){
 						canbeit = false;
@@ -1527,8 +1541,6 @@ Pyr.prototype = {
 			}
 
 			ntype = this.getType(args[1]);
-			console.log(args[1]);
-			console.log(ntype);
 			if(ntype == "int")
 				this.variables[args[0]] = new dateCreator["int"](args[1]);
 			else if(ntype == "float")
@@ -1678,32 +1690,37 @@ Pyr.prototype = {
 		if(this.patch.length == 0)
 			return "";
 	},
-	makeArgs: function(args){
+	makeArgs: function(args, justret){
 		var mam  = "";
 		open = false;
 		var vars = new Array();
+		if(typeof justret == "undefined") justret = false;
 		
 		for(var i=0;i<args.length; i+=1){
 			le = args.substring(i,i+1);
 			
 			if(open && le == "\""){
 				open = false;
-				mam = mam.trim();
+				//mam = mam.trim();
 				if(i == args.length-1){
 					if(mam.indexOf("\"") > -1){
 						mam+="\"";
 					}
-					var ex = this.execute(mam);
-					if(this.errorOcured) return ex;
 					
-					if(typeof ex == "object"){
-						var vx = getValue(ex);
-						if(ex.type == "string")
-							vars[vars.length] = "\""+getValue(ex)+"\"";
-						else
-							vars[vars.length] = getValue(ex);
+					if(justret){
+						vars[vars.length] = mam;
 					}else{
-						vars[vars.length] = "\""+ex+"\"";
+						var ex = this.execute(mam);
+						if(this.errorOcured) return ex;
+						if(typeof ex == "object"){
+							var vx = getValue(ex);
+							if(ex.type == "string")
+								vars[vars.length] = "\""+getValue(ex)+"\"";
+							else
+								vars[vars.length] = getValue(ex);
+						}else{
+							vars[vars.length] = "\""+ex+"\"";
+						}
 					}
 				}else mam+="\"";
 			}
@@ -1719,26 +1736,32 @@ Pyr.prototype = {
 						mam+=le;
 					mam = mam.trim();
 					
-					var ex = this.execute(mam);
-					if(this.errorOcured) return ex;
-					
-					if(typeof ex == "object"){
-						var vx = getValue(ex);
-						if(ex.type == "string")
-							vars[vars.length] = "\""+getValue(ex)+"\"";
-						else if(ex.type == "int" || ex.type == "float" || ex.type == "list")
-							vars[vars.length] = getValue(ex);
-						else
-							vars[vars.length] = ex;
-					}else
-						vars[vars.length] = "\""+ex+"\"";
-					
+					if(justret){
+						vars[vars.length] = mam;
+					}else{
+						var ex = this.execute(mam);
+						if(this.errorOcured) return ex;
+						
+						if(typeof ex == "object"){
+							var vx = getValue(ex);
+							if(ex.type == "string")
+								vars[vars.length] = "\""+getValue(ex)+"\"";
+							else if(ex.type == "int" || ex.type == "float" || ex.type == "list")
+								vars[vars.length] = getValue(ex);
+							else
+								vars[vars.length] = ex;
+						}else
+							vars[vars.length] = "\""+ex+"\"";
+					}
 					mam="";
 				}else{
 					mam+=le;
 				}
 			}	
 		}
+		
+		if(justret)
+			return vars;
 		
 		for(var i=0;i<vars.length; i+=1){
 			if(typeof vars[i] != "object")
@@ -2091,7 +2114,7 @@ function var_type_string(){
 	
 	var_Tstring.func["_init"] = function(vars, global){
 		var vl = getValue(vars[0]);
-		var value = (vl+"").trim();
+		var value = (vl+"");
 		if(value == "") value = getValue(vars[0]);
 		else value = vl+"";
 		
@@ -2252,9 +2275,6 @@ function var_type_list(){
 		global.errorOcured = true;
 		return dateCreator["NotImplemented"]("This is not implemented in '"+this.id.type+"' class");
 	}
-	var_Tlist.func["_add"] = function(vars, global){  // +=
-		return parseInt(this.id.vars["value"].value) + getValue(getFunct(vars[0], "_"+this.id.type, new Array(), global));
-	}
 	var_Tlist.func["add"] = function(vars, global){  // add object to next position
 		var thisIndex = getValue(this.id.vars["length"], "int");
 		this.id.vars[thisIndex] = vars[0];
@@ -2280,6 +2300,71 @@ function var_type_list(){
 	}
 		
 	return var_Tlist;
+}
+
+//var_type_dictionary
+function var_type_dictionary(){
+	var var_Tdictionary = var_type();
+	var_Tdictionary.type = "dictionary";
+	
+	var_Tdictionary.func["_init"] = function(vars, global){
+		if(vars.length == 1)
+			vars = global.makeArgs(vars[0].substring(1,vars[0].length-1), true);
+		for(i=0;i<vars.length;i++){
+			var vl = getValue(vars[i]);
+			var name = "";
+			for(var i = 0; i < vl.length; i++){
+				var chr = vl.charAt(i);
+				if(chr == ":") break;
+				name+=chr;
+			}
+			i++;
+			this.id.vars[getValue(global.execute(name.trim()))] = global.execute(vl.substr(i).trim());
+		}
+		this.id.vars["length"] = dateCreator["int"](vars.length);
+	}
+	var_Tdictionary.func["_string"] = function(vars, global){
+		var retstring = "{";
+		var i = 0;
+		for (key in this.id.vars) {
+			if(key == "length") continue;
+			if(i != 0)
+				retstring+= ", ";
+			retstring+="\""+key+"\": ";
+			valreturlo = getValue(this.id.vars[key],"string");
+			if(this.id.vars[key].type == "string")
+				retstring+= "\""+valreturlo+"\"";
+			else
+				retstring+= valreturlo;
+			i++;
+		}
+		retstring+="}";
+		return dateCreator["string"](retstring);
+	}
+	var_Tdictionary.func["add"] = function(vars, global){  // add object to next position
+		var thisIndex = getValue(this.id.vars["length"], "int");
+		this.id.vars[getValue(vars[0])] = vars[1];
+		this.id.vars["length"] = dateCreator["int"](thisIndex+1);
+		return null;
+	}
+	var_Tdictionary.func["_setitem"] = function(vars, global){  // [?] = 
+		if(getValue(vars[0]) == "") { 
+			global.errorOcured = true;
+			return dateCreator["IndexError"]("index is undefined");
+		}
+		this.id.vars[getValue(vars[1])] = vars[0];
+		return true;
+	}
+	var_Tdictionary.func["_getitem"] = function(vars, global){
+		var index = getValue(vars[0]);
+		if(typeof this.id.vars[index] == "undefined"){
+			global.errorOcured = true;
+			return dateCreator["IndexError"]("index '"+index+"' is out of range");
+		}
+		return this.id.vars[index];
+	}
+		
+	return var_Tdictionary;
 }
 
 function var_type_object(){
@@ -2311,6 +2396,15 @@ function var_type_function(){
 	}
 	var_Tfunction.func["_call"] = function(vars, global){
 		var savevar = $.extend( {}, global.variables );
+		
+		var vrsname = this.id.vars["args"].split(",");
+		for(var i=0;i<vrsname.length;i++){
+			vrsname[i] = vrsname[i].trim();
+			if(typeof vars[i] != "undefined")
+				global.variables[vrsname[i]] = vars[i];
+			else
+				global.variables[vrsname[i]] = dateCreator["null"]();
+		}
 		
 		var _global = var_type();
 			_global.id = this.id;
@@ -2520,6 +2614,8 @@ function getType(text){
 	
 	if(text.substr(text.length-1,1) == "]" && text.indexOf("[") != -1)
 		return "list";
+	if(text.substr(text.length-1,1) == "}" && text.indexOf("{") != -1)
+		return "dictionary";
 	
 	bots = 0;
 	while(i < text.length){
@@ -2565,6 +2661,7 @@ dateType["int"] 		= var_type_int;
 dateType["float"] 		= var_type_float;
 dateType["string"]		= var_type_string;
 dateType["list"]		= var_type_list;
+dateType["dictionary"]	= var_type_dictionary;
 dateType["function"]	= var_type_function;
 dateType["class"]		= var_type_class;
 
@@ -2719,15 +2816,16 @@ dateType["Library"] = function(){
 
 // Default constructors
 var dateCreator = {}
-dateCreator["null"] 	= function(){ 				var vars = dateType["null"](); 		args = new Array();						vars.func["_init"](args); 			return vars; }
-dateCreator["int"] 		= function(value, global){ 	var vars = dateType["int"](); 		args = new Array();args[0] = value; 	vars.func["_init"](args, global); 	return vars; }
-dateCreator["float"] 	= function(value){ 			var vars = dateType["float"](); 	args = new Array();args[0] = value; 	vars.func["_init"](args); 			return vars; }
-dateCreator["string"] 	= function(value){ 			var vars = dateType["string"](); 	args = new Array();args[0] = value;		vars.func["_init"](args); 			return vars; }
-dateCreator["list"] 	= function(value, global){ 	var vars = dateType["list"](); 		args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
-dateCreator["function"] = function(value, global){ 	var vars = dateType["function"](); 	args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
-dateCreator["class"] 	= function(value, global){ 	var vars = dateType["class"](); 	args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
-dateCreator["Canvas"] 	= function(value, global){ 	var vars = dateType["Canvas"](); 	args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
-dateCreator["Library"] 	= function(value, global){ 	var vars = dateType["Library"](); 	args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
+dateCreator["null"] 	 = function(){ 					var vars = dateType["null"](); 		args = new Array();						vars.func["_init"](args); 			return vars; }
+dateCreator["int"] 		 = function(value, global){ 	var vars = dateType["int"](); 		args = new Array();args[0] = value; 	vars.func["_init"](args, global); 	return vars; }
+dateCreator["float"] 	 = function(value){ 			var vars = dateType["float"](); 	args = new Array();args[0] = value; 	vars.func["_init"](args); 			return vars; }
+dateCreator["string"] 	 = function(value){ 			var vars = dateType["string"](); 	args = new Array();args[0] = value;		vars.func["_init"](args); 			return vars; }
+dateCreator["list"] 	 = function(value, global){ 	var vars = dateType["list"](); 		args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
+dateCreator["dictionary"]= function(value, global){ 	var vars = dateType["dictionary"]();args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
+dateCreator["function"]  = function(value, global){ 	var vars = dateType["function"](); 	args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
+dateCreator["class"] 	 = function(value, global){ 	var vars = dateType["class"](); 	args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
+dateCreator["Canvas"] 	 = function(value, global){ 	var vars = dateType["Canvas"](); 	args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
+dateCreator["Library"] 	 = function(value, global){ 	var vars = dateType["Library"](); 	args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
 //Errors
 function var_type_Error(type){
 	var var_TSyntaxError = var_type();
