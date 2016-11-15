@@ -908,15 +908,16 @@ Pyr.prototype = {
 								if(this.errorOcured) return ex;
 								savenamvar = __savenamvar;
 								var getvrat = this.func[savenamvar](ex);
+								
 								if(typeof getvrat != "undefined")
 									if(getvrat.type != "null")
 										return getvrat;
 								canbeit = true;	
 							}else if(this.errorOcured == false){
 								var argsi = this.makeArgs(mam);
-								vrat = locVariable.func["_call"](argsi, this);
+								vrat = locVariable.func["_call"](argsi, this);								
 								canbeit = true;
-								if(this.errorOcured) return ex;
+								if(this.errorOcured) return vrat;
 								if(this._parent != null && vrat == this._parent._TYPE_SYNC)
 									return this._TYPE_SYNC;
 							}
@@ -2417,10 +2418,45 @@ function var_type_function(){
 		var vrsname = this.id.vars["args"].split(",");
 		for(var i=0;i<vrsname.length;i++){
 			vrsname[i] = vrsname[i].trim();
-			if(typeof vars[i] != "undefined")
-				global.variables[vrsname[i]] = vars[i];
-			else
-				global.variables[vrsname[i]] = dateCreator["null"]();
+			
+			var namearg = "";
+			var convert = "";
+			var defaul_ = "";
+			var tpop = 0;
+			for(var l = 0; l < vrsname[i].length; l++){
+				var ch = vrsname[i].charAt(l);
+				if(ch == "<" && tpop == 0) tpop = 1;
+				else if(ch == ">") tpop = 0;
+				else if(ch == "=" && tpop == 0) tpop = 2;
+				else if(tpop == 2) defaul_+=ch;
+				else if(tpop == 1) convert+=ch;
+				else namearg+=ch;
+			}
+			namearg = namearg.trim();
+			convert = convert.trim();
+			defaul_ = defaul_.trim();
+			
+			if(typeof vars[i] != "undefined"){
+				if(convert != ""){
+					if(typeof vars[i].func["_"+convert] == "undefined"){
+						global.errorOcured = true;
+						return dateCreator["ConvertError"]("Can not convert argument '"+namearg+"' to '"+convert+"'");;
+					}
+					global.variables[namearg] = vars[i].func["_"+convert](new Array(), global);
+				}else
+					global.variables[namearg] = vars[i];
+			}else{
+				if(defaul_ != "")
+					global.variables[namearg] = global.createVar(defaul_);
+				else
+					global.variables[namearg] = dateCreator["null"]();
+			}
+			
+			if(global.errorOcured){
+				var retError = global.variables[namearg];				
+				global.variables = $.extend( {}, savevar );
+				return retError;
+			}
 		}
 		
 		var _global = var_type();
