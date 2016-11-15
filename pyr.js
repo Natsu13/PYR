@@ -501,7 +501,10 @@ Pyr.prototype = {
 									this.errorOcured = true;
 									return executed;
 								}
-								this.throwError((executed.func["type"]())+": "+getValue(executed.vars["error"]), radek+poii, xa, _local_data.mam, _fileName);
+								if(typeof executed == "undefined")
+									this.throwError("Undefined error", radek+poii, xa, _local_data.mam, _fileName);
+								else
+									this.throwError((executed.type)+": "+getValue(executed.vars["error"]), radek+poii, xa, _local_data.mam, _fileName);
 							}else if(executed != "" && executed != null){
 								//_local_data.return_object = executed;
 								//_local_data.i = excode.length;
@@ -696,7 +699,9 @@ Pyr.prototype = {
 		builder = "",
 		nofucntionnow = false;
 		notBeVarButFunc = false,
-		myActionAft = "";
+		myActionAft = "",
+		openLowZavro = 0,
+		openAleradyis = false;
 		var excode = code;
 		if(typeof filename == "undefined") filename = "<console>";
 		if(typeof pline == "undefined") pline = 1;
@@ -707,9 +712,9 @@ Pyr.prototype = {
 		}
 		
 		normal = excode;
-		if(excode.substring(excode.length-1,excode.length) != ";")
+		if(excode.substring(excode.length-1,excode.length) != ";"){
 			excode+=";";
-		else{
+		}else{
 			normal = excode.substring(0,excode.length-1);
 		}
 		/*
@@ -799,7 +804,7 @@ Pyr.prototype = {
 				}else if(le == "=" && excode.substring(i,i+2) == "=="){
 					mam+="==";i+=2;
 					continue;
-				}else if(le == "." && !nofucntionnow && !isIn(mam, this.operators)){
+				}else if(le == "." && !nofucntionnow && !isIn(mam, this.operators) && openLowZavro == 0){
 					if(this.getType(mam) == "int"){
 						mam+=".";
 					}else if(this.getType(mam) == "float"){
@@ -861,13 +866,24 @@ Pyr.prototype = {
 						
 						mam = "";
 					}
-				}else if(le == "(" && !nofucntionnow){
-					savenamvar = mam;
-					mam = "";					
-				}else if(le == ")" && !nofucntionnow){
+				}else if(le == "(" && !nofucntionnow && ( !isIn(mam, this.operators) || openAleradyis )){					
+					if(openLowZavro == 0){
+						savenamvar = mam;
+						mam = "";
+						openLowZavro = 1;
+						openAleradyis = true;
+					}else{
+						openLowZavro++;
+						mam+="(";
+					}
+				}else if(le == ")" && !nofucntionnow && openLowZavro > 1 && ( !isIn(mam, this.operators) || openAleradyis )){
+					openLowZavro--;
+					mam+=")";
+				}else if(le == ")" && !nofucntionnow && ( !isIn(mam, this.operators) || openAleradyis )){
+					openLowZavro--;
+					openAleradyis = false;
 					canbeit = false;
-					notBeVarButFunc = true;
-					
+					notBeVarButFunc = true;					
 					if(varcom == "" || (varcom == "" && savenamvar.substring(0,4) == "new ")){
 						if(savenamvar.substring(0,4) == "new "){
 							var objname = savenamvar.substring(4);
@@ -885,12 +901,9 @@ Pyr.prototype = {
 							fullname = savenamvar;
 							var locVariable = this.isVariable(savenamvar, i, filename, excode, fullname);
 							if(typeof this.func[savenamvar] != "undefined"){
-								console.log(mam);
-								
 								var __savenamvar = savenamvar;
-								var ex = this.makeArgs(mam);
 								
-								console.log(ex);
+								var ex = this.makeArgs(mam);
 								
 								if(this.errorOcured) return ex;
 								savenamvar = __savenamvar;
@@ -908,7 +921,7 @@ Pyr.prototype = {
 									return this._TYPE_SYNC;
 							}
 						}
-					}else if(typeof varcom.body[savenamvar] != "undefined"){
+					}else if(typeof varcom.body != "undefined" && typeof varcom.body[savenamvar] != "undefined"){
 						varcom = varcom.body[savenamvar];
 						fullname += "."+savenamvar;
 						canbeit = true;							
@@ -949,7 +962,6 @@ Pyr.prototype = {
 					if(acttype == "" && varcom != "" && mam == ""){
 						vrat = varcom;
 					}else if(acttype == "" && mam!=""){
-						//if(mam.indexOf('-') > 0 || mam.indexOf('+') > 0 || mam.indexOf('/') > 0 || mam.indexOf('*') > 0 || mam.indexOf('%') > 0 || mam.indexOf('==') > 0 || mam.indexOf('!=') > 0 || mam.indexOf('>') > 0 || mam.indexOf('<') > 0){
 						if(isIn(mam, this.operators)){
 							if(isIn(le, this.operators) && i == excode.length-1){
 								this.errorOcured = true;
@@ -1397,7 +1409,7 @@ Pyr.prototype = {
 								if(this.getType(num1) == "variable" || this.getType(num1) == "list") { num1 = this.execute(num1, filename); }
 								if(this.errorOcured){ return num1; }
 								if(this.getType(num2) == "variable" || this.getType(num2) == "list") { num2 = this.execute(num2, filename); }
-								if(this.errorOcured){ return num2; }
+								if(this.errorOcured){ return num2; }														
 								
 								if(thisisfloat == true){ type1="float";type2="float"; }
 								else{ 	
@@ -1411,9 +1423,6 @@ Pyr.prototype = {
 								}
 																	
 								cislo1 = dateCreator[type1](num1, this);
-								/* if(typeof num1.func[fnc] == "undefined"){
-									cislo1 = dateCreator["string"](num1.func["_string"](), this);
-								}	*/							
 								cislo2 = dateCreator[type2](num2, this);
 								
 								fnc = acutalfunct[actualchars.indexOf(lastoperator)];
@@ -1713,6 +1722,7 @@ Pyr.prototype = {
 					if(mam.indexOf("\"") > -1){
 						mam+="\"";
 					}
+					mam = mam.trim();
 					
 					if(justret){
 						vars[vars.length] = mam;
@@ -1742,10 +1752,10 @@ Pyr.prototype = {
 					if(i == args.length-1)
 						mam+=le;
 					mam = mam.trim();
-					
+										
 					if(justret){
 						vars[vars.length] = mam;
-					}else{
+					}else{					
 						var ex = this.execute(mam);
 						if(this.errorOcured) return ex;
 						
@@ -1927,7 +1937,7 @@ function var_type(){
 	var_Tobject.func["_get"] 		= function(vars, global){ }; // Delete maybe...
 	var_Tobject.func["_set"] 		= function(vars, global){ this.id.vars[vars[0]] = vars[1]; }; // Update value
 	//functions
-	var_Tobject.func["type"] 		= function(vars, global){ return this.id.type; };
+	var_Tobject.func["type"] 		= function(vars, global){ return dateCreator["string"](this.id.type); };
 	
 	var_Tobject.func.id = var_Tobject;
 	

@@ -418,7 +418,7 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 							<div class=selected_tab xx=5 id=devtab5>Log</div>
 							<div class=tab xx=6 id=devtab6>Variables</div>
 							<div class=tab xx=7 id=devtab7>Output</div>
-							<div class=tab xx=8 id=devtab8 style="display:none;">Console</div>
+							<div class=tab xx=8 id=devtab8>Handler</div>
 						</div><div style='clear:both;'></div>
 						
 						<div style="overflow: auto;height: 144px;" id="debugtab5">
@@ -434,7 +434,7 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 							<div id="terminal2" style="margin:0px;background:black;color:white;" onClick="$('#terminal_code').focus();"></div>
 						</div>
 						<div style="overflow: auto;height: 144px;display:none;" id="debugtab8">
-							
+							<textarea style="width:100%;height:144px;background:black;border:1px solid silver;" id="handler" readonly></textarea>
 						</div>
 					</div>
 				</div>
@@ -447,6 +447,24 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 	</div>
 	<div id="template_blank_page"  style="display:none;"><div style="font-size: 57px;color: #1d1d1d;text-align: center;padding-top: 69px;">Blank page</div></div>
 	<script>
+	var _js_errors_catch = 0;
+	window.onerror = function (message, file, line, col, error) {
+		_js_errors_catch++;
+		$("#devtab8").html("Handler ("+_js_errors_catch+")");
+		$("#handler").val(message+"\n[  "+file+" ("+line+":"+col+")  ]\n"+$("#handler").val());
+	};
+	/*
+	var oldLog = console.log;
+    console.log = function (message) {
+		if(typeof message != "object"){
+			_js_errors_catch++;
+			var temp = new Date();
+			$("#devtab8").html("Handler ("+_js_errors_catch+")");
+			$("#handler").val("["+temp.getHours()+":"+(temp.getMinutes()<10?"0"+temp.getMinutes():temp.getMinutes())+"] "+message+"\n"+$("#handler").val());
+		}
+        oldLog.apply(console, arguments);
+    };
+	*/
 	var editor = CodeMirror.fromTextArea(document.getElementById("code"), {
 		lineNumbers: true,
 		styleActiveLine: true,
