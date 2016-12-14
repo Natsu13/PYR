@@ -333,7 +333,18 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 #terminal {background-color:black;color:white;font-family:courier,fixed,swiss,monospace,sans-serif;font-size:14px;}
 #terminal2 {background-color:black;color:white;font-family:courier,fixed,swiss,monospace,sans-serif;font-size:14px;}
 
-.inside_whatewer {overflow: hidden;}
+.CodeMirror-scroll {
+  height: auto;
+  overflow-y: hidden;
+  overflow-x: auto;
+}
+
+.pbt {
+	padding: 2px 6px;
+    margin-right: 6px;
+}
+
+.inside_whatewer {overflow: auto;}
 </style>
 <link rel="stylesheet" href="./codemirror/base16-dark.css">
 <link rel="stylesheet" href="./codemirror/codemirror.css">
@@ -425,7 +436,8 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 							<div class="info_msg">PYR debug line....</div>
 						</div>
 						<div style="overflow: auto;height: 144px;display:none;" id="debugtab6">
-							variables...
+							<button onClick="varload();">Refresh</button>
+							<div id=variablescontent>Pres the refresh button...</div>
 						</div>
 						<div style="overflow: auto;height: 144px;display:none;" id="debugtab7">
 							<form action=# onSubmit="try{ terminal_execute(); }catch(Error){ errorCatcher(Error, 'Form'); }finally{ return false; }" style="height:0px;border: 0px;padding:0px;margin:0px;position:relative;top:-1px;">
@@ -453,6 +465,22 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 		$("#devtab8").html("Handler ("+_js_errors_catch+")");
 		$("#handler").val(message+"\n[  "+file+" ("+line+":"+col+")  ]\n"+$("#handler").val());
 	};
+	
+	function varload(){
+		//variablescontent
+		var i = $("#variablescontent");
+		i.html("");
+		for (var vars in pyr.variables) {
+			var_name = vars;
+			if(var_name == "id") continue;
+			vars = pyr.variables[vars];
+			val = "...";
+			if(typeof vars.type == "undefined") vtp = "undefined"; else vtp = vars.type;
+			val = getValue(vars);
+			i.append("<div style='border-bottom:1px solid #1f1f1f;padding:5px;'><span style='display:inline-block;width:150px;'>"+vars.type+"</span><span style='display:inline-block;width:200px;'>"+var_name+"</span><span style='width:200px;'>"+val.replace(/</g,"&lt;")+"</span></div>");
+		}
+	}
+	
 	/*
 	var oldLog = console.log;
     console.log = function (message) {
@@ -525,13 +553,14 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 			}
 		}else{
 			//terminal.setColor("silver").write("[Executeting code]").next().setColor("white");
+			//executed = pyr.compile(val, "<console>", 0, 0, true, true);
 			executed = pyr.execute(val, "<console>");
 			if(executed != "null" && executed!=null){
 				if(pyr.isError()){
 					terminal.setColor("red");				
 					//terminal.write("ErrorCatcher: ").next();
 					if(getValue(executed.vars["tline"]) == ""){
-						terminal.write((executed.func["type"]())+": "+getValue(executed.vars["error"])).setColor("white");
+						terminal.write((getValue(executed.func["type"]()))+": "+getValue(executed.vars["error"])).setColor("white");
 					}else{
 						if(getValue(executed.vars["line"]) != "NaN"){
 							terminal.write("  Line "+getValue(executed.vars["line"])+", in file "+getValue(executed.vars["file"])+"").next();
@@ -542,10 +571,15 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 							}
 							terminal.write(mezera+"^").next();
 						}
-						terminal.write((executed.func["type"]())+": "+getValue(executed.vars["error"])).setColor("white");
+						terminal.write((getValue(executed.func["type"]()))+": "+getValue(executed.vars["error"])).setColor("white");
 					}
 				}else{
-					terminal.write(""+getValue(executed, "")).setColor("white").next();
+					var ret = getValue(executed, "");
+					if(ret != "null"){
+						if(terminal.getCurrentLine() != "")
+							terminal.next();
+						terminal.write(""+getValue(executed, "")).setColor("white").next();
+					}
 				}
 			}
 			if(terminal.getCurrentLine() != ""){ terminal.next(); }
@@ -586,6 +620,7 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 		var vl = $("#runbutt").html();
 		if(vl == "RUN"){
 			terminal.clear();
+			console.log("==========================================================");
 			_pyr_thread = new Pyr(terminal);
 			_pyr_thread.files = files;
 			pyr = _pyr_thread;
@@ -606,7 +641,8 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 	function stoped(){
 		$("#infoprog").html("ID vlákna: ...");
 		$("#runbutt").html("RUN");
-		terminal.next();
+		if(terminal.getCurrentLine() != "")
+			terminal.next();
 		_pyr_thread._thread_stoped = true;
 	}
 	var selectedDIV = "", lastDIVsel = "", selectedBUT = "", selectData = new Array();
@@ -724,17 +760,12 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 	var editors = new Array();
 	
 	var comp = [
-		["here", "hither"],
-		["asynchronous", "nonsynchronous"],
-		["completion", "achievement", "conclusion", "culmination", "expirations"],
-		["hinting", "advive", "broach", "imply"],
-		["function","action"],
-		["provide", "add", "bring", "give"],
-		["synonyms", "equivalents"],
-		["words", "token"],
-		["each", "every"],
 		["return"],
-		["repeat"]
+		["repeat"],
+		["function"],
+		["int"],
+		["float"],
+		["string"]
 	  ]
 	
 	function hintCode(cm, option) {
@@ -767,7 +798,7 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 				item.attr("id", cat+"_"+i);
 				item.attr("data-exc", it.exc);
 				item.attr("data-name", it.name);
-				item.html(it.name);
+				item.html("<button class=pbt onClick=\"$('#run_file').val('"+it.name+"');\">P</button>"+it.name);
 				if(it.selected){
 					item.addClass("selected");
 				}
@@ -826,7 +857,7 @@ button a:focus, a.button:focus, .ContextMenu a:focus, a.ContextMenu:focus, input
 					last_showed_page.show();
 					
 					redraw_filelist();
-				})
+				});
 				id.append(item);
 			}
 			i++;

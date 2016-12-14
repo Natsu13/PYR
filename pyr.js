@@ -50,9 +50,33 @@ function isIn(text, array){
 	return false;
 }
 
+
+function isInNf(text, array){
+	var open=false, txop = false;
+	mam ="";
+	for(var i=0;i<text.length;i++){
+		c = text.charAt(i);
+		if(c == "\""){ open=!open; }
+		else if(c == "(" && !open) txop = true;
+		else if(c == ")" && !open) txop = false;
+		if(!open && !txop && c != "\"" && c != ")") mam+=c;
+	}
+	text = mam;
+	//console.log(mam);
+	for (val of array) {
+		if(text.indexOf(val) > -1)
+			return true;
+	}
+	return false;
+}
+
 var thread = 0;
 
 window.open_ = window.open;
+
+var _async_variable_set_name_is = null,
+	_async_variable_set_vari_is = null,
+	_async_variable_set_is_sett = false;
 
 var Pyr = function(terminal){
 	this.terminal = terminal;
@@ -64,7 +88,7 @@ var Pyr = function(terminal){
 	this._thread_id = thread++;
 	this._thread_ticks = 0;
 	this.files = null;
-	this._TYPE_SYNC = {};
+	this._TYPE_SYNC = {isSync: true};
 	this._wait_finis = false;
 	this._parent = null;
 	
@@ -83,7 +107,6 @@ var Pyr = function(terminal){
 		return dateCreator["null"]();
 	}
 	fnc["print_r"] = function(vars){
-		console.log(vars);
 		this.id.terminal.write("["+vars[0].type+"]{").next();
 		for (key in vars[0].vars) {
 			m = "";for(var o=0;o<10-key.length;o++) m+=" ";
@@ -108,7 +131,14 @@ var Pyr = function(terminal){
 		return dateCreator["list"]('["browser","JavaScript","'+navigator.sayswho+'","'+navigator.vendor+'","'+navigator.platform+'"]', this.id);
 	}
 	fnc["alert"] = function(vars){
-		alert(getValue(vars[0]).toString());
+		alert(getValue(vars[0]).toString().replace(/\\n/g, "\n"));
+		return dateCreator["null"]();
+	}
+	fnc["prompt"] = function(vars){
+		var retur = prompt(getValue(vars[0]).toString().replace(/\\n/g, "\n"), getValue(vars[1]).toString());
+		if(retur != null){
+			return dateCreator["string"](retur);
+		}
 		return dateCreator["null"]();
 	}
 	fnc["error"] = function(vars){
@@ -125,7 +155,7 @@ var Pyr = function(terminal){
 	
 	var _this = var_type();
 		_this.id = this;
-		_this.type = "object";
+		_this.type = "dictionary";
 		_this.name = "this";
 		_this.func["_get"] = function(vars, global){
 			return "N00L";
@@ -173,11 +203,20 @@ var Pyr = function(terminal){
 	this.operators = new Array("==","!=",">","<",">=","<=","+","-","/","*","%","?");
 	
 	library = new Array();
+	
+	this.compileError = new Array();
+	this.compileErrorInt = 0;
+	this.isClass = false;
+	this.subClass = null;
+	this.unlocked = 0;
+	this.processIDs = 0;
 }
+var actualPyrInstance = new Array();
 var ErrorOcured=false;
 
 Pyr.prototype = {
-	compile: function(code, _fileName, si, poii, nocomp, returnError, myLocalData){
+	compile: function(code, _fileName, si, poii, nocomp, returnError, myLocalData, procesID){
+		code = code.trim();
 		this.errorOcured = false;
 		this._thread_ticks++;
 		if(typeof this._save_last_error == "undefined")
@@ -203,27 +242,46 @@ Pyr.prototype = {
 				_time_: Date.now(),
 				ltype: "",
 				openblock: 0,
-				return_object: ""
+				return_object: "",
+				compileId: this.compileErrorInt,
+				openZavorka: 0,
+				procesID: procesID,
+				_thread_call_agan: false,
+				_thread_call_save_pos: 0
 			}
+			this.compileError[_local_data.compileId] = null;
+			this.compileErrorInt++;
 		}else{
 			var _local_data = myLocalData;
 		}
+		
+		if(typeof _local_data.procesID == "undefined" || _local_data.procesID == undefined) _local_data.procesID = this.processIDs++;
 
 		if(typeof this.save_time_ == "undefined")
 			this.save_time_	= _local_data._time_;
 		
 		var _wait_me = false;
 		if(this._parent != null){
+			//console.log(this._parent);
 			if(this._parent._wait_finis)
 				_wait_me = true;
 		}
 		
 		if(typeof returnError == "undefined") returnError = false;
 		
-		if((this._wait_finis || _wait_me) && this._thread_stoped != true){
+		if(((this._wait_finis || _wait_me) && this._thread_stoped != true)){
 			var _this = this, _code = code, _filename = _fileName, _si = si, _poii = poii, _nocomp = nocomp, _re = returnError, _ld = myLocalData;
-				setTimeout(function(){_this.compile(_code, _filename, _si, _poii, _nocomp, _re, _ld);}, 0);
+			//console.log("Wait("+_local_data.procesID+"/"+this.processIDs+"/"+this._thread_id+"):"+_code.substr(0,30).replace(/\n/, " "));
+			//console.log(_wait_me);
+			//console.log(this);
+			setTimeout(function(){_this.compile(_code, _filename, _si, _poii, _nocomp, _re, _ld);}, 0);
 			return;
+		}else{
+			//console.log("Continue("+_local_data.procesID+"/"+this.processIDs+"/"+this._thread_id+"):"+code.substr(0,30).replace(/\n/, " "));
+			//console.log(this._wait_finis);
+			//console.log(_wait_me);
+			//console.log(this._parent);
+			//console.log(this);
 		}
 		
 		if(this._thread_stoped){ _local_data.i = excode.length;this._wait_finis = false; }
@@ -234,7 +292,12 @@ Pyr.prototype = {
 		var radek = 1, xa = 1;
 		var save_funct_name = "";
 		
+		if(this.isClass) nocomp = true;
+		
+		if(this.compileError[_local_data.compileId] == true){ _local_data.i = excode.length; }
 		if(excode.length == _local_data.i-1) return;
+		
+		//console.log(_local_data);
 		
 		while(_local_data.i < excode.length && !stop__this){
 			this.errorOcured = false;
@@ -244,7 +307,6 @@ Pyr.prototype = {
 			
 			if((_local_data.close_expresion_at != "" && _local_data.close_expresion_at != le && _local_data.ptype != "") || (_local_data.close_expresion_at == "}" && le == "{") || (_local_data.close_expresion_at == "}" && le == "}" && _local_data.openblock>0)){
 				_local_data.mam+=le;
-				//console.log(close_expresion_at+", le: "+le+"("+openblock+")");
 				if(_local_data.close_expresion_at == "}" && le == "{")
 					_local_data.openblock++;
 				if(_local_data.close_expresion_at == "}" && le == "}" && _local_data.openblock>0)
@@ -268,6 +330,16 @@ Pyr.prototype = {
 				}
 				_local_data.mam+=le;
 			}
+			else if((le != "(" ) && _local_data.openZavorka > 1){
+				if(le == ")"){
+					_local_data.openZavorka--;
+					_local_data.mam+=")";
+				}else{
+					_local_data.mam+=le;
+					//console.log(_local_data.openZavorka);
+					//console.log(_local_data.mam);
+				}
+			}
 			else if(le == "#" && _local_data.type == ""){
 				_local_data.type = "defined";
 			}else if(le == "\n" && _local_data.type == "defined"){
@@ -276,12 +348,12 @@ Pyr.prototype = {
 					msg = _local_data.mam.substr(exp[0].length+1);
 					logit(msg, 'warning_msg');
 				}else if(_local_data.mam == "top"){
-					_thread_call_save_pos = 0;
-					_thread_call_agan = true;
+					_local_data._thread_call_save_pos = 0;
+					_local_data._thread_call_agan = true;
 					_local_data.i = excode.length;
 				}else if(_local_data.mam == "jump"){
-					_thread_call_save_pos = _local_data.mam.substr(exp[0].length+1);
-					_thread_call_agan = true;
+					_local_data._thread_call_save_pos = _local_data.mam.substr(exp[0].length+1);
+					_local_data._thread_call_agan = true;
 					_local_data.i = excode.length;
 				}
 				_local_data.mam = "";
@@ -302,21 +374,34 @@ Pyr.prototype = {
 							if(returnError && this.errorOcured){
 								return this.variables[save_funct_name];
 							}
+							this.variables[save_funct_name].useClass = this;
 						}
 						else if(_local_data.ptype == "class"){
 							//save_class_name
-							console.log(save_class_name);
-							console.log(_local_data.mam);
+							this.variables[_local_data.save_class_name] = new dateCreator["class"](new Array(_local_data.save_class_name,_local_data.save_parents,_local_data.mam, _fileName), this);
+							if(returnError && this.errorOcured){
+								return this.variables[save_funct_name];
+							}
 						}
 						else if(_local_data.ptype == "try"){
-							var erro__ = this.compile(_local_data.mam,_fileName,0,radek, true, true);
+							this._save_last_error = "";
+							//console.log(_local_data.mam);
+							
+							var erro__ = this.compile(_local_data.mam,_fileName,0,radek, true, true, undefined);
 							if(this.errorOcured){
 								this.errorOcured=false;
 								this._save_last_error = erro__;
 							}
 							_local_data.mam = "";
+							//this._parent = erro__;
 							
 							if(erro__ == this._TYPE_SYNC){
+								//console.log("SYNC");
+								//console.log(code.substr(0,30).replace(/\n/, " "));
+								//if(typeof this._parent != "undefined" && this._parent != "" && this._parent != null)
+									//console.log(this._parent._wait_finis);
+								//console.log(this._wait_finis);
+								//console.log(this._parent);
 								_break_it_all_and_call_again = true;
 							}
 						}
@@ -341,22 +426,31 @@ Pyr.prototype = {
 								
 								if(can){
 									var savevar = $.extend( {}, this.variables );
-									console.log(this._save_last_error);
 									this.variables[saveVarNameErr] = this._save_last_error;
 									
+									this.returned = null;
 									var erro__ = this.compile(_local_data.mam,_fileName,0,radek,true);
 									if(returnError && this.errorOcured)
 										return erro__;
 									
 									this.variables = $.extend( {}, savevar );
 									this._save_last_error = "_catched";
+									
+									if(this.returned != null){
+										_local_data.mam = _local_data.mam.trim();
+										_local_data.return_object = erro__;
+										_local_data.i = excode.length;
+										_local_data.mam = "";
+										_local_data.type = "";
+										this.returned = null;
+									}
 								}
 							}
 						}
 						else if(_local_data.ptype == "while"){
 							var threa = 0;
 							var expresion = this.execute(_local_data.save_expresion);
-							while(getValue(expresion, "int", this) == 1 && threa < 1000){
+							while(getValue(expresion, "int", this) == 1 && threa < 100000){
 								var erro__ = this.compile(_local_data.mam,_fileName,0,radek, true);
 								if(returnError && this.errorOcured){
 									return erro__;
@@ -368,7 +462,7 @@ Pyr.prototype = {
 								expresion = this.execute(_local_data.save_expresion);
 								threa++;
 							}
-							if(threa == 1000) {
+							if(threa == 100000) {
 								if(returnError){
 									this.errorOcured = true;
 									return dateCreator["SyntaxError"]("Loop: Never eneded loop!");
@@ -392,17 +486,17 @@ Pyr.prototype = {
 						_local_data.ltype = _local_data.ptype;
 						_local_data.ptype = "";
 						
-						if(_break_it_all_and_call_again){
-							_thread_call_save_pos = _local_data.i;
-							_thread_call_agan = true;
+						if(_break_it_all_and_call_again){							
+							_local_data._thread_call_save_pos = _local_data.i+1;
+							_local_data._thread_call_agan = true;
 							this._wait_for_sync = true;
 							_local_data.i = excode.length;
 							break;
 						}
 					}else{
 						_local_data.close_expresion_at = "";						
-						_local_data.mam+="}";
-						//_local_data.mam = "";
+						//_local_data.mam+="}";
+						_local_data.mam = "";
 						_local_data.ptype = "";
 					}
 					/*
@@ -411,6 +505,7 @@ Pyr.prototype = {
 					*/
 				}
 			}else if(le == "\n" || le == ";"){
+				//console.log(_local_data.mam);
 				if(_local_data.mam != "" && le == "\n"){
 					if(_local_data.ptype == ""){
 						_local_data.i = excode.length;
@@ -425,6 +520,7 @@ Pyr.prototype = {
 				if(_local_data.type == "return"){
 					_local_data.mam=_local_data.mam.trim();
 					_local_data.return_object = this.execute(_local_data.mam);
+					this.returned = _local_data.return_object;
 					_local_data.i = excode.length;
 					_local_data.mam = "";
 					_local_data.type = "";
@@ -438,8 +534,8 @@ Pyr.prototype = {
 							var executed = this.compile(this.files[_local_data.mam], filenam, 0, 0, true);
 							
 							if(executed == this._TYPE_SYNC){							
-								_thread_call_save_pos = i;
-								_thread_call_agan = true;
+								_local_data._thread_call_save_pos = i;
+								_local_data._thread_call_agan = true;
 								this._wait_for_sync = true;
 								_local_data.i = excode.length;
 								break;
@@ -484,14 +580,32 @@ Pyr.prototype = {
 							doit=true;
 						}
 					}
+					
 					if(doit){
-						var executed = this.execute(_local_data.mam, _fileName);
+						//console.log("=====>");
+						//console.log(_local_data.mam);
+						//console.log(_local_data.procesID);
+						actualPyrInstance[_local_data.procesID] = this;
+						var executed = this.execute(_local_data.mam, _fileName, 0, _local_data.compileId);
+						//console.log(_local_data.mam);
+						//console.log(executed);
+						if(typeof executed != "undefined" && executed != null &&  executed != "" && typeof executed.isSync != "undefined" && executed.isSync == true){
+							executed = this._TYPE_SYNC;
+							//console.log("Other object sync converted to current sync");
+						}
+						//console.log("<=====");
 						if(executed == this._TYPE_SYNC){
+							//console.log(code.substr(0,30).replace(/\n/, " "));
+							//console.log(_local_data.mam);
+							//console.log(this._parent);
+							//console.log("WAITING----");
+							//console.log(this._parent);
 							_local_data.mam = "";
-							_thread_call_save_pos = _local_data.i+1;
-							_thread_call_agan = true;
+							_local_data._thread_call_save_pos = _local_data.i+1;
+							_local_data._thread_call_agan = true;
 							this._wait_for_sync = true;
 							_local_data.i = excode.length;
+							//this.unlocked++;
 							break;
 						}
 						else if(_local_data.ptype == ""){
@@ -529,6 +643,8 @@ Pyr.prototype = {
 			}else if(mame.trim() == "class"){
 				_local_data.type = "class";
 				_local_data.mam = "";
+				_local_data.save_class_name = "";
+				_local_data.save_parents = "";
 			}else if(mame.trim() == "import"){
 				_local_data.type = "import";
 				_local_data.mam = "";
@@ -550,13 +666,19 @@ Pyr.prototype = {
 				_local_data.close_expresion_at = "";
 				_local_data.mam = "";
 			}else if(le == "{" && _local_data.type == "class"){
-				save_class_name = _local_data.mam.trim();
+				if(_local_data.save_class_name == "")
+					_local_data.save_class_name = _local_data.mam.trim();
 				_local_data.ptype = _local_data.type;
 				_local_data.ltype = _local_data.type;
 				_local_data.type = "";
 				_local_data.close_expresion_at = "}";		
 				_local_data.mam = "";
-			}else if(le == "(" && _local_data.type == ""){
+			}else if(le == "(" && _local_data.type == "class" && _local_data.openZavorka == 0){
+				_local_data.openZavorka++;
+				_local_data.save_class_name = _local_data.mam.trim();
+				_local_data.mam = "";
+			}else if(le == "(" && _local_data.type == "" && _local_data.openZavorka == 0){
+				_local_data.openZavorka++;
 				var popak = _local_data.mam.split(" ");
 				if(_local_data.mam == "if"){
 					_local_data.ptype = _local_data.type;
@@ -578,6 +700,7 @@ Pyr.prototype = {
 					}
 					else{
 						_local_data.i = excode.length;
+						//console.log(_local_data);
 						if(returnError){
 							this.errorOcured = true;
 							return dateCreator["SyntaxError"]("Unexpected token catch");
@@ -586,7 +709,17 @@ Pyr.prototype = {
 					}
 				}else 
 					_local_data.mam+=le;
-			}else if(le == ")"){
+			}else if(le == "(" && _local_data.openZavorka > 0){
+				_local_data.openZavorka++;
+				_local_data.mam+="(";
+			}else if(le == ")" && _local_data.type == "class" && _local_data.openZavorka == 1){
+				_local_data.openZavorka--;
+				_local_data.save_line = _local_data.i+1;
+				_local_data.expresion_state = true;
+				_local_data.save_parents = _local_data.mam;
+				_local_data.mam = "";
+			}else if(le == ")" && _local_data.type != "return" && _local_data.openZavorka == 1){
+				_local_data.openZavorka--;
 				if(_local_data.type != ""){
 					_local_data.close_expresion_at = "";
 					_local_data.save_expresion = _local_data.mam;
@@ -643,8 +776,12 @@ Pyr.prototype = {
 				}else if((_local_data.ptype == "if" || _local_data.ptype == "else" || _local_data.ptype == "while" || _local_data.ptype == "function" || _local_data.ptype == "try" || _local_data.ptype == "catch") && le != " "){
 					_local_data.close_expresion_at = "\n";					
 					_local_data.mam+=le;
-				}else
-					_local_data.mam+=le;
+				}else{
+					if(le.trim() == "" && _local_data.mam.trim() == "")
+					{/*Mezera na začátku je zlá!*/}
+					else
+						_local_data.mam+=le;					
+				}
 			}
 			_local_data.i++;
 			xa++;
@@ -657,11 +794,23 @@ Pyr.prototype = {
 			*/
 		}
 		
-		if(_thread_call_agan && !this._thread_stoped){
-			var _this = this, _code = code, _filename = _fileName, _pcsp = _thread_call_save_pos, _ld = _local_data, __returnError = returnError;
+		//console.log("===KONEC====");
+		//console.log(code);
+		//console.log(_local_data._thread_call_agan);
+		//console.log(this._thread_stoped);
+		
+		if(_local_data._thread_call_agan && !this._thread_stoped){
+			//console.log("CALLED AGAIN");
+			//console.log(code);
+			//console.log("============");
+			var _pcsp = _local_data._thread_call_save_pos;
+			_local_data._thread_call_save_pos = 0;
+			_local_data._thread_call_agan = false;
+			var _this = this, _code = code, _filename = _fileName, _ld = _local_data, __returnError = returnError;
 			setTimeout(function(){_this.compile(_code, _filename, _pcsp, 0, nocomp, __returnError, _ld);}, 0);
 			return this._TYPE_SYNC;
 		}else{
+			//this.unlocked--;
 			if(!nocomp){
 				if(!this.errorOcured){
 					logit("Program ended at "+((Math.floor((Date.now() - _local_data._time_) / 10))/100)+"s", 'info_msg');
@@ -680,7 +829,14 @@ Pyr.prototype = {
 			logit("<div style='float:right;'>"+fname+" (<a href='#' onClick='selectIn(this);return false;'>"+line+":"+at+"</a>)</div><div class=expand onClick=\"expand("+tmi+");return false;\">"+error+"</div><div style='display: none;color: #2D2D2D;margin-left: 17px;padding-left: 5px;margin-top: 3px;border-left: 2px solid #7B7B7B;' id='id_error_exp_"+(tmi)+"'>"+what+"</div>", 'error_msg');
 		}
 	},
-	execute: function(code, filename, posLine){
+	execute: function(code, filename, posLine, compileId){
+	
+		if(code.substr(code.length-1) == ";") d = code.substr(0, code.length-1); else d = code;
+		if(typeof this.variables[d] != "undefined"){
+			return this.variables[d];
+		}
+		this.errorOcured = false;
+		
 		this.errorOcured = false;
 		var PyrID = this;
 		var i = 0,
@@ -707,8 +863,9 @@ Pyr.prototype = {
 		if(typeof pline == "undefined") pline = 1;
 		
 		var znak = excode.substring(0,1);
-		if(znak == "-" || znak == "+"){
+		if(znak == "-" || znak == "+"){// || isInNf(excode, this.operators)
 			nofucntionnow = true;
+			//console.log("NOFUNCTION---");
 		}
 		
 		normal = excode;
@@ -735,6 +892,7 @@ Pyr.prototype = {
 			}
 			else if(open){
 				if(i == excode.length-1){
+					if(mam.trim() == "") break;
 					this.errorOcured = true;
 					vrat = dateCreator["EOLError"]("EOL while scanning string", pline, i, filename, excode);
 					mam="";
@@ -747,9 +905,13 @@ Pyr.prototype = {
 					mam+=le;
 			}
 			else{
-				if((le == "=" || excode.substring(i,i+2) == "+=" || excode.substring(i,i+2) == "-=") && excode.substring(i,i+2) != "==" && excode.substring(i-1,i) !="!" && !nofucntionnow){
+				//console.log(nofucntionnow+", "+mam+", "+excode.substring(i,i+2)+", "+(!nofucntionnow && (le == "=" || excode.substring(i,i+2) == "+=" || excode.substring(i,i+2) == "-=") && excode.substring(i,i+2) != "==" && excode.substring(i-1,i) !="!"));
+				if(!nofucntionnow && (le == "=" || excode.substring(i,i+2) == "+=" || excode.substring(i,i+2) == "-=") && excode.substring(i,i+2) != "==" && excode.substring(i-1,i) !="!"){
+					//console.log(excode.substring(i,i+2));
 					acttype = "assignment";
 					if(excode.substring(i,i+2) == "+=" || excode.substring(i,i+2) == "-="){
+						//console.log(mam);
+						//console.log("Set type");
 						this.subacttype = excode.substring(i,i+2);
 						i++;
 					}else{
@@ -776,9 +938,13 @@ Pyr.prototype = {
 							canbeit = true;	
 						}else if(typeof varcom.func["_setattr"] != "undefined"){
 							//var __t = varcom.func["_setattr"](varcom, this.execute(mam));
+							//console.log("AHA");
 							acttype = "_set_with_setattr";
-							args["funct"] = varcom.func["_setattr"];
+							args["null"] = null;
+							args["funct"] = "_setattr";
+							args["varcom"] = varcom;
 							args["name"]  = mam;
+							args["subacttype"] = this.subacttype;
 							canbeit = true;	
 						}else if(this.getType(mam) != "variable"){
 							this.errorOcured = true;
@@ -790,8 +956,7 @@ Pyr.prototype = {
 							
 						if(!canbeit){
 							this.errorOcured = true;
-							if(fullname!="") fullname=fullname+".";
-							console.log(mam);
+							if(fullname!="") fullname=fullname+".";							
 							vrat = dateCreator["NameError"]("variable '"+fullname+""+mam+"' is not defined", pline, i-(mam.length), filename, excode);
 							mam="";
 							break;
@@ -804,7 +969,10 @@ Pyr.prototype = {
 				}else if(le == "=" && excode.substring(i,i+2) == "=="){
 					mam+="==";i+=2;
 					continue;
-				}else if(le == "." && !nofucntionnow && !isIn(mam, this.operators) && openLowZavro == 0){
+				}else if(!nofucntionnow && le == "." && !isInNf(mam, this.operators) && openLowZavro == 0){
+					//console.log("=============");
+					//console.log("=  OBJECT   =");
+					//console.log("=============");
 					if(this.getType(mam) == "int"){
 						mam+=".";
 					}else if(this.getType(mam) == "float"){
@@ -855,7 +1023,7 @@ Pyr.prototype = {
 							if(!canbeit){
 								//this.error("Variable with name: "+mam+" doesn't exists!");
 								this.errorOcured = true;
-								if(fullname!="") fullname=fullname+".";								
+								if(fullname!="") fullname=fullname+".";
 								vrat = dateCreator["NameError"]("variable '"+fullname+""+mam+"' is not defined", pline, i-(mam.length), filename, excode);
 								mam="";
 								break;
@@ -866,7 +1034,7 @@ Pyr.prototype = {
 						
 						mam = "";
 					}
-				}else if(le == "(" && !nofucntionnow && ( !isIn(mam, this.operators) || openAleradyis )){					
+				}else if(!nofucntionnow && le == "(" && ( !isInNf(mam, this.operators) || openAleradyis )){
 					if(openLowZavro == 0){
 						savenamvar = mam;
 						mam = "";
@@ -876,10 +1044,10 @@ Pyr.prototype = {
 						openLowZavro++;
 						mam+="(";
 					}
-				}else if(le == ")" && !nofucntionnow && openLowZavro > 1 && ( !isIn(mam, this.operators) || openAleradyis )){
+				}else if(!nofucntionnow && le == ")" && openLowZavro > 1 && ( !isInNf(mam, this.operators) || openAleradyis )){
 					openLowZavro--;
 					mam+=")";
-				}else if(le == ")" && !nofucntionnow && ( !isIn(mam, this.operators) || openAleradyis )){
+				}else if(!nofucntionnow && le == ")" && ( !isInNf(mam, this.operators) || openAleradyis )){
 					openLowZavro--;
 					openAleradyis = false;
 					canbeit = false;
@@ -892,18 +1060,41 @@ Pyr.prototype = {
 								fullname += savenamvar.substring(4);
 								canbeit = true;	
 							}else{
-								this.errorOcured = true;
-								vrat = dateCreator["NameError"]("class '"+savenamvar.substring(4)+"' is not defined", pline, i-(savenamvar.length)-1-(mam.length), filename, excode);
-								mam="";
-								break;
+								fullname += savenamvar.substring(4);
+								var variab = this.isVariable(objname, i, filename, excode, fullname);
+								
+								if(this.errorOcured){								
+									this.errorOcured = true;
+									vrat = dateCreator["NameError"]("class '"+savenamvar.substring(4)+"' is not defined", pline, i-(savenamvar.length)-1-(mam.length), filename, excode);
+									mam="";
+									break;
+								}else if(variab.type != "class"){
+									this.errorOcured = true;
+									vrat = dateCreator["NameError"]("variable '"+savenamvar.substring(4)+"' is not class", pline, i-(savenamvar.length)-1-(mam.length), filename, excode);
+									mam="";
+									break;
+								}else{
+									vrat = variab.func["_new"](new Array(objname), this);
+									if(this.errorOcured){
+										mam="";
+										break;
+									}
+									if(typeof vrat == "object" && vrat.isSync){
+										//console.log(vrat);
+										return vrat;
+										break;
+									}
+									canbeit = true;	
+								}
 							}
 						}else{
+							savenamvar = savenamvar.trim()
 							fullname = savenamvar;
 							var locVariable = this.isVariable(savenamvar, i, filename, excode, fullname);
 							if(typeof this.func[savenamvar] != "undefined"){
 								var __savenamvar = savenamvar;
 								
-								var ex = this.makeArgs(mam);
+								var ex = this.makeArgs(mam);								
 								
 								if(this.errorOcured) return ex;
 								savenamvar = __savenamvar;
@@ -914,9 +1105,13 @@ Pyr.prototype = {
 										return getvrat;
 								canbeit = true;	
 							}else if(this.errorOcured == false){
-								var argsi = this.makeArgs(mam);
-								vrat = locVariable.func["_call"](argsi, this);								
-								canbeit = true;
+								//console.log("error");
+								if(locVariable == undefined || ( typeof locVariable.func == "undefined" && typeof locVariable.func["_call"] == "undefined")) this.errorOcured = true;
+								else{
+									var argsi = this.makeArgs(mam);
+									vrat = locVariable.func["_call"](argsi, this);								
+									canbeit = true;
+								}
 								if(this.errorOcured) return vrat;
 								if(this._parent != null && vrat == this._parent._TYPE_SYNC)
 									return this._TYPE_SYNC;
@@ -932,13 +1127,30 @@ Pyr.prototype = {
 						invararg[0] = varcom; 				//Variable in JS
 						invararg[1] = savenamvar;    		//Name of function to execute
 						invararg[2] = mam;   				//Variables args
-						varcom = this.priAction("execute", invararg);
+						varcom = this.priAction("execute", invararg, compileId);
 						canbeit = true;
 						if(this.errorOcured) return varcom;
 						if(varcom == this._TYPE_SYNC){
 							return varcom;
-							break;
 						}
+					}else if(typeof varcom.func["_getattr"] != "undefined"){
+						fullname += "."+savenamvar;
+						var useClass = null;
+						if(typeof varcom._pyr_thread != "undefined" && varcom._pyr_thread != null) useClass = varcom._pyr_thread;
+						
+						var cerror = varcom.func["_getattr"](new Array(savenamvar), this);
+						
+						if(this.errorOcured){
+							canbeit = false;
+						}else if(cerror.type == "function"){							
+							var argsi = this.makeArgs(mam);
+							if(typeof varcom._pyr_thread != "undefined" && useClass == null)
+								_inp = varcom._pyr_thread;
+							else
+								_inp = (useClass == null?this:useClass);
+							vrat = cerror.func["_call"](argsi, _inp);
+							canbeit = true;
+						}else{ varcom = cerror;canbeit = true; }
 					}else if(typeof varcom.vars[savenamvar] != "undefined"){
 						var argsi = this.makeArgs(mam);
 						vrat = varcom.vars[savenamvar].func["_call"](argsi);
@@ -963,13 +1175,14 @@ Pyr.prototype = {
 					if(acttype == "" && varcom != "" && mam == ""){
 						vrat = varcom;
 					}else if(acttype == "" && mam!=""){
-						if(isIn(mam, this.operators)){
-							if(isIn(le, this.operators) && i == excode.length-1){
+						if(isInNf(mam, this.operators)){
+							if(i == excode.length-1 && isInNf(le, this.operators)){
 								this.errorOcured = true;
 								vrat = dateCreator["SyntaxError"]("unexpected EOF while parsing", pline, i, filename, excode);
 								mam="";
 								break;
 							}else{
+								//console.log(mam);
 								vrat = this.mathCompile(mam, filename);
 								mam = "";
 								if(this.errorOcured == true)
@@ -978,7 +1191,10 @@ Pyr.prototype = {
 							
 						}
 						else if(varcom == ""){
+							//console.log(this);
+							//console.log(mam);
 							locVariable = this.isVariable(mam, i, filename, excode, fullname);
+							//console.log(locVariable);
 							if(acttype == "assignment"){
 								
 							}else if(this.errorOcured == false){
@@ -991,11 +1207,18 @@ Pyr.prototype = {
 							mam = "";
 						}else{
 							canbeit = false;
+							cerror = "";
 							
 							if(typeof varcom.body[mam] != "undefined"){
 								varcom = varcom.body[mam];
 								fullname += "."+mam;
 								canbeit = true;							
+							}else if(typeof varcom.func["_getattr"] != "undefined"){
+								//fullname += "."+mam;
+								var cerror = varcom.func["_getattr"](new Array(mam), this);
+								if(this.errorOcured){
+									canbeit = false;
+								}else{ varcom = cerror;canbeit = true; }
 							}else if(typeof varcom.func[mam] != "undefined"){
 								fullname += "."+mam;
 								invararg = new Array();
@@ -1015,7 +1238,10 @@ Pyr.prototype = {
 							if(!canbeit){
 								this.errorOcured = true;
 								if(fullname!="") fullname=fullname+".";
-								vrat = dateCreator["NameError"]("variable '"+fullname+""+mam+"' is not defined", pline, i-(mam.length), filename, excode);
+								if(cerror != "" && cerror.type != "NameError")
+									vrat = cerror;
+								else
+									vrat = dateCreator["NameError"]("variable '"+fullname+""+mam+"' is not defined", pline, i-(mam.length), filename, excode);
 								mam="";
 								break;
 							}
@@ -1025,8 +1251,11 @@ Pyr.prototype = {
 					}
 					
 					if(acttype!=""){
-						if(acttype == "_set_with_setattr"){							
-							var __t = args["funct"](new Array(this.createVar("\""+args["name"]+"\""), this.execute(mam.trim())), this);
+						if(acttype == "_set_with_setattr"){
+							var argssave = args;
+							var _this = this;
+							var varse = (function(){return _this.execute(mam.trim());})();
+							var __t = argssave["varcom"].func[argssave["funct"]](new Array(this.createVar("\""+argssave["name"]+"\""), varse, argssave["subacttype"]), this);
 							if(this.errorOcured == true){
 								vrat = __t;
 							}else{
@@ -1065,6 +1294,9 @@ Pyr.prototype = {
 		return vrat;
 	},
 	mathCompile: function(text, filename){
+			//console.log("Math compile:");
+			//console.log(text);
+			
 			var vstup = "",
 				vystup = text;
 				
@@ -1154,7 +1386,8 @@ Pyr.prototype = {
 			vstup = buff;
 			
 			var save_operator = "";
-			
+	
+	if(isIn(vstup,alloperato_)){
 			var alloperator = Array(),
 				allopsize = 0;
 			for (var key in unar_op) {
@@ -1171,12 +1404,12 @@ Pyr.prototype = {
 					var chr = vstup.substring(a,a+1),
 						ch2 = vstup.substring(a,a+2);
 					
-					if(chr == "\"" && open == false){
+					if((chr == "\"" || chr == "(") && open == false){
 						open = true;
-						buff+="\"";
-					}else if(chr == "\"" && open == true){
+						buff+=chr;
+					}else if((chr == "\"" || chr == ")") && open == true){
 						open = false;
-						buff+="\"";
+						buff+=chr;
 						a++;
 						chr = vstup.substring(a,a+1);
 						ch2 = vstup.substring(a,a+2);
@@ -1205,8 +1438,10 @@ Pyr.prototype = {
 							}else{
 								//this.errorOcured = true;
 								//return dateCreator["SyntaxError"]("Unexpected identifier");
-								vystup+=buff;
-								buff = "";
+								if(isIn(ch2,alloperato_) && !isIn(vstup.substring(a+1,a+3),actualchars)){
+									vystup+=buff;
+									buff = "";
+								}
 							}
 						}else{
 							for(var i = 0;i < pos;i++){
@@ -1219,8 +1454,7 @@ Pyr.prototype = {
 									save_operator = actualchars[i];
 									omam = true;
 									if(actualchars[i].length > 1)
-										a++;
-									
+										a+=actualchars[i].length-1;
 									if(buff.trim()!=""){
 										fnc = acutalfunct[actualchars.indexOf(actualchars[i])][0];
 									}else{
@@ -1241,8 +1475,19 @@ Pyr.prototype = {
 						}
 							
 						if(fnc != ""){
-							var num1, cislo1;
-							cislo1 = this.isVariable(buff);
+							var num1 = buff, cislo1;
+							if(this.getType(num1) == "variable"){
+								num1 = this.execute(num1);
+							}
+							/*
+							console.log(num1);
+							var type1 = this.getType(num1);
+							console.log(type1);
+							if(type1 == "variable") { num1 = this.execute(num1, filename); }
+							console.log(num1);
+							if(this.errorOcured){ return num1; }*/
+							//cislo1 = this.isVariable(num1);
+							cislo1 = num1;
 							var vysledek = cislo1.func[fnc](new Array(dateCreator["string"](save_operator)), this);
 							save_operator = "";
 							if(this.errorOcured){ return vysledek; }
@@ -1254,7 +1499,9 @@ Pyr.prototype = {
 					}
 				}
 			}
+	}
 			
+			//console.log("======NEW=====");
 			var alloperator = Array(),
 				allopsize = 0;
 			for (var key in operace) {
@@ -1268,7 +1515,7 @@ Pyr.prototype = {
 			if(vystup.trim() == "") vystup = vstup;
 
 			for (var key in operace) {
-				vstup = vystup.trim();
+				vstup = (""+vystup).trim();
 				vystup = "";
 				
 				var lastoperator = "",
@@ -1282,24 +1529,29 @@ Pyr.prototype = {
 					acutalfunct[pos] = operace[key][act];
 					pos++;
 				}
+				
+				if(!isIn(vstup,actualchars)){ vystup = vstup; continue; }
 			
 				var num1 = "", num2 = "";
 				var buff = "";
 				var thisisfloat = false;
 				var open = false;
+				var openBy = "";
 				
 				for(var a = 0;a < vstup.length;a++){
 					var chr = vstup.substring(a,a+1),
 						ch2 = vstup.substring(a,a+2);
 					var pro = false;
 					
-					if(chr == "\"" && open == false){
+					if(open == false && (chr == "\"" || chr == "(")){
+						openBy = chr;
+						if(openBy == "(") openBy = ")";
 						open = true;
-						buffer+="\"";
-					}else if(chr == "\"" && open == true){
+						buffer+=chr;
+					}else if(open == true && (chr == "\"" || chr == ")") && openBy == chr){
 						open = false;
 						if(a != vstup.length-1){
-							buffer+="\"";
+							buffer+=chr;
 							a++;
 							chr = vstup.substring(a,a+1);
 							ch2 = vstup.substring(a,a+2);
@@ -1312,7 +1564,7 @@ Pyr.prototype = {
 						buffer+=chr;
 					}
 					
-					if(open == false){						
+					if(open == false){
 						for(var i = 0;i < pos;i++){
 							if(actualchars[i].length > 1)
 								chr = vstup.substring(a,a+actualchars[i].length);
@@ -1323,44 +1575,56 @@ Pyr.prototype = {
 								
 								pro = true;
 								
-								if(lastoperator != ""){								
+								if(lastoperator != ""){
 									num2 = buffer.trim();
 									
-									if(this.getType(num1) == "variable" || this.getType(num1) == "list") { num1 = this.execute(num1, filename); }
+									var type1 = st1 = this.getType(num1),
+										type2 = st2 = this.getType(num2);
+									
+									//console.log(this);
+									//console.log("===");
+									//console.log(type1);
+									//console.log(num1);
+									//console.log(this.execute(num1, filename));
+										
+									if(type1 == "variable" || type1 == "list") { num1 = this.execute(num1, filename);type1 = st1 = this.getType(num1); }
 									if(this.errorOcured){ return num1; }
-									if(this.getType(num2) == "variable" || this.getType(num2) == "list") { num2 = this.execute(num2, filename); }
+									if(type2 == "variable" || type2 == "list") { num2 = this.execute(num2, filename);type2 = st2 = this.getType(num2); }
 									if(this.errorOcured){ return num2; }
 									
+									//console.log(num1);
+										
 									if(thisisfloat == true){ type1="float";type2="float"; }
 									else{ 	
-										if(this.getType(num1) == "float" || this.getType(num2) == "float"){ 
+										if(type1 == "float" || type2 == "float"){ 
 											thisisfloat = true;
 											type1 = "float";type2 = "float"; 
 										}
-										else{ 
-											type1 = this.getType(num1);type2 = this.getType(num2); 
-										} 
 									}	
-									cislo1 = dateCreator[type1](num1, this);
-									/* if(typeof num1.func[fnc] == "undefined"){
-										cislo1 = dateCreator["string"](num1.func["_string"](), this);
-									}	*/
-									cislo2 = dateCreator[type2](num2, this);
+									if(st1 != "variable" || st1 == "list") cislo1 = dateCreator[type1](num1, this); else cislo1 = num1;
+									if(st2 != "variable" || st2 == "list"){
+										cislo2 = dateCreator[type2](num2, this);
+									}else cislo2 = num2;
 									
 									fnc = acutalfunct[actualchars.indexOf(lastoperator)];
 									var savefnc = fnc;
 									if(Object.prototype.toString.call(fnc) === '[object Array]'){
 										fnc = fnc[0];
 									}
-												
+													
 									var argu = new Array();
 									argu[0] = cislo2;
+																		
+									//console.log(num1);
+									//console.log(cislo1);
+									//console.log(cislo2);																	
 											
 									if(typeof cislo1.func[fnc] == "undefined"){
 										cislo1 = cislo1.func["_string"]();
 									}
 									var vysledek = cislo1.func[fnc](argu, this);
-									if(this.errorOcured){ 
+									//console.log(vysledek);
+									if(this.errorOcured){
 										var _sv = cislo1;
 										cislo1 = cislo2;
 										cislo2 = _sv;
@@ -1369,6 +1633,7 @@ Pyr.prototype = {
 										this.errorOcured = false;
 										var saveerror = vysledek;
 										argu[0] = cislo2;
+										
 										var vysledek = cislo1.func[fnc](argu, this);
 										
 										if(this.errorOcured){
@@ -1407,24 +1672,36 @@ Pyr.prototype = {
 							if(lastoperator != ""){
 								num2 = buffer.trim();
 								
-								if(this.getType(num1) == "variable" || this.getType(num1) == "list") { num1 = this.execute(num1, filename); }
-								if(this.errorOcured){ return num1; }
-								if(this.getType(num2) == "variable" || this.getType(num2) == "list") { num2 = this.execute(num2, filename); }
-								if(this.errorOcured){ return num2; }														
+								var type1 = st1 = this.getType(num1),
+									type2 = st2 = this.getType(num2);
+									
+								//console.log("=====");
+								//console.log(type1);
+								//console.log(num1);
+								//console.log(type2);
+								//console.log(num2);
+								//console.log(this.execute(num1, filename));
 								
+								
+									
+								if(type1 == "variable" || type1 == "list") { num1 = this.execute(num1, filename);type1 = st1 = this.getType(num1); }
+								if(this.errorOcured){ return num1; }
+								if(type2 == "variable" || type2 == "list") { num2 = this.execute(num2, filename);type2 = st2 = this.getType(num2); }
+								if(this.errorOcured){ return num2; }
+								
+								//console.log(num1);
+									
 								if(thisisfloat == true){ type1="float";type2="float"; }
 								else{ 	
-									if(this.getType(num1) == "float" || this.getType(num2) == "float"){ 
+									if(type1 == "float" || type2 == "float"){ 
 										thisisfloat = true;
 										type1 = "float";type2 = "float"; 
 									}
-									else{ 
-										type1 = this.getType(num1);type2 = this.getType(num2); 
-									} 
-								}
-																	
-								cislo1 = dateCreator[type1](num1, this);
-								cislo2 = dateCreator[type2](num2, this);
+								}	
+								if(st1 != "variable" || st1 == "list") cislo1 = dateCreator[type1](num1, this); else cislo1 = num1;
+								if(st2 != "variable" || st2 == "list"){
+									cislo2 = dateCreator[type2](num2, this);
+								}else cislo2 = num2;
 								
 								fnc = acutalfunct[actualchars.indexOf(lastoperator)];
 								var savefnc = fnc;
@@ -1434,9 +1711,14 @@ Pyr.prototype = {
 												
 								var argu = new Array();
 								argu[0] = cislo2;
-												
-								var vysledek = cislo1.func[fnc](argu, this);
-								if(this.errorOcured){ 
+								
+								//console.log(cislo1);
+								//console.log(cislo2);								
+								
+								var vysledek = cislo1.func[fnc](argu, this);	
+								//console.log(vysledek);
+								
+								if(this.errorOcured){
 									var _sv = cislo1;
 									cislo1 = cislo2;
 									cislo2 = _sv;
@@ -1445,6 +1727,8 @@ Pyr.prototype = {
 									this.errorOcured = false;
 									var saveerror = vysledek;
 									argu[0] = cislo2;
+									//console.log(cislo1);
+									//console.log(fnc);
 									var vysledek = cislo1.func[fnc](argu, this);
 									
 									if(this.errorOcured){
@@ -1452,7 +1736,9 @@ Pyr.prototype = {
 									}
 								}
 								
+							
 								vystup+=vysledek+""+operwi+"";
+								//vystup+=vysledek+""+operwi+"";
 								
 								num1 = "";
 								num2 = "";
@@ -1470,10 +1756,19 @@ Pyr.prototype = {
 				
 				if(num1 != "") vystup+=num1;
 				if(buffer != "" && vystup == "") vystup = buffer;
+				//console.log(vystup);
+				var isNum = parseInt(vystup);
+				//console.log(isNum);
+				if(!isNaN(isNum)) vystup = isNum;
+				else vystup = "\""+vystup+"\"";
+				//console.log(vystup);
+				//console.log("<===END");
 			}
+		//console.log("OUTPUT: "+vystup);
+		if(vystup.substr(0,1) == "\"" && vystup.substr(vystup.length-1,1) == "\"") vystup = vystup.substr(1, vystup.length-2);
 		return vystup;
 	},
-	priAction: function(how, args){
+	priAction: function(how, args, compileId){
 		if(how == "assignment"){
 			create = false;
 			
@@ -1503,7 +1798,7 @@ Pyr.prototype = {
 			}
 			this.subacttype = "";
 			
-			if(typeof args[0] == "object"){				
+			if(typeof args[0] == "object"){
 				args[2] = this.execute(args[2]);
 				args[0].func["_set"](new Array(args[1], args[2]), this);
 				
@@ -1545,12 +1840,23 @@ Pyr.prototype = {
 				this.errorOcured = false;
 			}
 			
+			_async_variable_set_name_is = args[0];
+			_async_variable_set_vari_is = this.variables;
+			_async_variable_set_is_sett = false;
+			
 			var mam = args[1];
 			args[1] = this.execute(args[1]);
+			
+			//console.log(args[1]);
+			
+			_async_variable_set_name_is = null;
 			
 			if(this.errorOcured){
 				return args[1];
 			}
+			
+			if(_async_variable_set_is_sett)
+				return true;
 			
 			if(typeof args[1] == "object"){
 				this.variables[args[0]] = args[1];
@@ -1574,7 +1880,7 @@ Pyr.prototype = {
 			myvar = args[0];
 			fucnt = args[1];
 			varsm = this.makeArgs(args[2]);
-			return myvar.func[fucnt](varsm, this);
+			return myvar.func[fucnt](varsm, this, compileId);
 		}
 		
 		return null;
@@ -1594,22 +1900,42 @@ Pyr.prototype = {
 			return dateCreator["null"](val);		
 		
 	},
-	isVariable: function(mam, i, filename, excode){
-		var typet = this.getType(mam);		
+	isVariable: function(mam, i, filename, excode){		
+		var typet = this.getType(mam);
+		
+		var part = this.subClass;
+		while(typeof part != "undefined" && part != null){
+			if(typeof part.variables[mam] != "undefined") return part.variables[mam];
+			part = part.subClass;
+		}
+		
+		//console.log(">>X>>");
+		//console.log(mam);
+		//console.log(typet);
+		
 		if(typet == "list" && mam.substr(0,1) != "[") typet = "variable";
+		//console.log(typeof this.variables[mam]);
+		//console.log(this.subClass);
+		//console.log(mam.substr(mam.length-1,1) == "]");
 		if(typet != "variable"){
 			vrat = new dateCreator[this.getType(mam)](mam, this);
 		}else if(typeof this.variables[mam] != "undefined"){
 			vrat = this.variables[mam];
+		}else if(this.subClass != null && typeof this.subClass.variables[mam] != "undefined"){
+			//console.log("x#####");
+			vrat = this.subClass.variables[mam];
 		}else if(mam.substr(mam.length-1,1) == "]"){
+			//console.log(">>>>>");
+			//console.log(mam);
 			var thisvar = "", savename = "", saveindex = "";
 			var thisptc = null, can = 1, stateha = 0;
 			for(var pi = 0; pi<mam.length; pi++){
 				var znk = mam.substr(pi,1);
 				if(stateha == 0){
 					if(znk == "["){
-						if(typeof this.variables[thisvar] != "undefined"){
-							thisptc = this.variables[thisvar];
+						if(typeof this.variables[thisvar] != "undefined" || ( this.subClass != null && this.subClass.variables[thisvar] != "undefined" )){
+							thisptc = ((this.subClass != null && typeof this.subClass.variables[thisvar] != "undefined")?this.subClass.variables[thisvar]:this.variables[thisvar]);
+							//console.log(thisptc);
 							savename = thisvar;
 							thisvar = "";
 							stateha++;
@@ -1680,8 +2006,16 @@ Pyr.prototype = {
 		}else if(typeof dateType[mam] != "undefined"){
 			vrat = dateCreator["string"]("native class '"+mam+"'", this);
 		}else{
-			vrat = dateCreator["NameError"]("variable '"+mam+"' is not defined", this.pline, i-(mam.length), filename, excode);
-			this.errorOcured = true;
+			if(mam.indexOf(".") > -1){
+				vrat = this.execute(mam);
+				if(this.errorOcured){
+					vrat = dateCreator["NameError"]("variable '"+mam+"' is not defined", this.pline, i-(mam.length), filename, excode);
+					this.errorOcured = true;
+				}
+			}else{
+				vrat = dateCreator["NameError"]("variable '"+mam+"' is not defined", this.pline, i-(mam.length), filename, excode);
+				this.errorOcured = true;
+			}
 		}
 		return vrat;
 	},
@@ -1756,8 +2090,10 @@ Pyr.prototype = {
 										
 					if(justret){
 						vars[vars.length] = mam;
-					}else{					
+					}else{
+						//console.log(mam);
 						var ex = this.execute(mam);
+						//console.log(ex);
 						if(this.errorOcured) return ex;
 						
 						if(typeof ex == "object"){
@@ -1846,8 +2182,8 @@ var var_type_count = 1;
 function var_type(){
 	var var_Tobject = new DefaultVar();
 	
-	var_Tobject.type = "";										//Type like "int", "float", "string", etc...
-	var_Tobject.id = var_type_count;							//ID of object like #1 for first object
+	var_Tobject.type = "object";										//Type like "int", "float", "string", etc...
+	var_Tobject.id = var_type_count;									//ID of object like #1 for first object
 	var_type_count++;
 		
 	var_Tobject.func["_new"] 		= function(vars, global){ };
@@ -1863,11 +2199,11 @@ function var_type(){
 	
 	var_Tobject.func["_pos"] 		= function(vars, global){ }; // +
 	var_Tobject.func["_neg"] 		= function(vars, global){ }; // -
-	var_Tobject.func["_abs"] 		= function(vars, global){ }; // abs()	-1.50 => 1.50
+	var_Tobject.func["_abs"] 		= function(vars, global){ }; // abs()	 -1.50 => 1.50
 	var_Tobject.func["_invert"] 	= function(vars, global){ }; // ~
 	var_Tobject.func["_round"] 		= function(vars, global){ }; // round()   1.25 => 1
 	var_Tobject.func["_floor"] 		= function(vars, global){ }; // floor()   1.25 => 1
-	var_Tobject.func["_ceil"] 		= function(vars, global){ }; // ceil()	 1.25 => 2
+	var_Tobject.func["_ceil"] 		= function(vars, global){ }; // ceil()	  1.25 => 2
 	var_Tobject.func["_trunc"] 		= function(vars, global){ }; // trunc()   1.25 => 1
 	
 	var_Tobject.func["_add"] 		= function(vars, global){ global.errorOcured = true;return dateCreator["UnsuportedOperator"]("Operator + is not supported in '"+this.id.type+"' class"); }; // +
@@ -1979,15 +2315,30 @@ function var_type_int(){
 		return parseInt(this.id.vars["value"].value) / getValue(getFunct(vars[0], "_"+this.id.type, new Array(), global),"int");
 	}
 	var_Tint.func["_add"] = function(vars, global){  // +
-		return parseInt(this.id.vars["value"].value) + getValue(getFunct(vars[0], "_"+this.id.type, new Array(), global),"int");
+		//console.log("plas");
+		//console.log(vars);
+		//console.log(this);
+		var n = 0;
+		if(typeof vars[0] == "object" && vars[0].type == "int") n = vars[0].vars["value"].value;
+		else if(!isNaN(parseInt(vars[0]))) n = vars[0];
+		else n = getValue(getFunct(vars[0], "_"+this.id.type, new Array(), global),"int");
+		return this.id.vars["value"].value + n;
 	}
 	var_Tint.func["_iadd"] = function(vars, global){  // +=
+		//console.log(vars);
+		//console.log(this);
 		var nw = getValue(getFunct(vars[0], "_"+this.id.type, new Array(), global),"int");
 		if( global.errorOcured ) return nw;
 		this.id.vars["value"].value += nw;
 	}
 	var_Tint.func["_sub"] = function(vars, global){  // -
-		return parseInt(this.id.vars["value"].value) - getValue(getFunct(vars[0], "_"+this.id.type, new Array(), global),"int");
+		console.log(vars);
+		console.log(this);
+		var n = 0;
+		if(typeof vars[0] == "object" && vars[0].type == "int") n = vars[0].vars["value"].value;
+		else if(!isNaN(parseInt(vars[0]))) n = vars[0];
+		else n = getValue(getFunct(vars[0], "_"+this.id.type, new Array(), global),"int");
+		return this.id.vars["value"].value - n;
 	}
 	var_Tint.func["_isub"] = function(vars, global){  // -=
 		var nw = getValue(getFunct(vars[0], "_"+this.id.type, new Array(), global),"int");
@@ -2385,46 +2736,30 @@ function var_type_dictionary(){
 	return var_Tdictionary;
 }
 
-function var_type_object(){
-	var var_Tobject = var_type();
-	var_Tobject.type = "object";
-	
-	var_Tobject.func["_init"] = function(vars, global){
-		this.id.vars["container"] = vars;
-	}
-	var_Tobject.func["_string"] = function(vars, global){
-		global.errorOcured = true;
-		return dateCreator["SyntaxError"]("Not implemented");
-	}
-	
-	return var_Tobject;
-}
-
+/* FUNCTION */
 function var_type_function(){
 	var var_Tfunction = var_type();
 	var_Tfunction.type = "function";
+	var_Tfunction.useClass = null;
 	
 	var_Tfunction.func["_init"] = function(vars, global){
 		this.id.vars["name"] = vars[0][0];
 		this.id.vars["args"] = vars[0][1];
 		this.id.vars["code"] = vars[0][2];
-	}
-	var_Tfunction.func["_string"] = function(vars, global){
-		return dateCreator["string"]("<function "+this.id.vars["name"]+">");
-	}
-	var_Tfunction.func["_call"] = function(vars, global){
-		var savevar = $.extend( {}, global.variables );
+		this.id.vars["args_name"] = new Array();
+		this.id.vars["args_type"] = new Array();
+		this.id.vars["args_defa"] = new Array();
 		
-		var vrsname = this.id.vars["args"].split(",");
-		for(var i=0;i<vrsname.length;i++){
-			vrsname[i] = vrsname[i].trim();
+		this.id.vars["args_spla"] = this.id.vars["args"].split(",");
+		for(var i=0;i<this.id.vars["args_spla"].length;i++){
+			vrsname = this.id.vars["args_spla"][i].trim();
 			
 			var namearg = "";
 			var convert = "";
 			var defaul_ = "";
 			var tpop = 0;
-			for(var l = 0; l < vrsname[i].length; l++){
-				var ch = vrsname[i].charAt(l);
+			for(var l = 0; l < vrsname.length; l++){
+				var ch = vrsname.charAt(l);
 				if(ch == "<" && tpop == 0) tpop = 1;
 				else if(ch == ">") tpop = 0;
 				else if(ch == "=" && tpop == 0) tpop = 2;
@@ -2432,9 +2767,24 @@ function var_type_function(){
 				else if(tpop == 1) convert+=ch;
 				else namearg+=ch;
 			}
-			namearg = namearg.trim();
-			convert = convert.trim();
-			defaul_ = defaul_.trim();
+			this.id.vars["args_name"][i] = namearg.trim();
+			this.id.vars["args_type"][i] = convert.trim();
+			this.id.vars["args_defa"][i] = defaul_.trim();
+		}
+	}
+	var_Tfunction.func["_string"] = function(vars, global){
+		return dateCreator["string"]("<function "+this.id.vars["name"]+">");
+	}
+	var_Tfunction.func["_call"] = function(vars, global){
+		//if(this.id.useClass != null) global = this.id.useClass;
+		var savevar = $.extend( {}, global.variables );
+		//var savevar = global.variables;
+		//console.log("CALLING FUNCTION "+this.id.vars["name"]);
+		
+		for(var i=0;i<this.id.vars["args_spla"].length;i++){
+			namearg = this.id.vars["args_name"][i];
+			convert = this.id.vars["args_type"][i];
+			defaul_ = this.id.vars["args_defa"][i];
 			
 			if(typeof vars[i] != "undefined"){
 				if(convert != ""){
@@ -2455,6 +2805,7 @@ function var_type_function(){
 			if(global.errorOcured){
 				var retError = global.variables[namearg];				
 				global.variables = $.extend( {}, savevar );
+				//global.variables = savevar;
 				return retError;
 			}
 		}
@@ -2467,20 +2818,22 @@ function var_type_function(){
 			}
 			_global.func["_getitem"] = function(vars, global){  // [?]
 				vars[0] = getValue(vars[0]);
-				console.log(vars[0]);
-				console.log(savevar);
-				if(typeof savevar.variables[vars[0]] == "undefined"){
+				if(typeof savevar[vars[0]] == "undefined"){
 					global.errorOcured = true;
 					return dateCreator["IndexError"]("index '"+vars[0]+"' is undefined");
 				}
-				return savevar.variables[vars[0]];
+				return savevar[vars[0]];
 			}
 			_global.func["_getattr"] = function(vars, global){
 				var name = getValue(vars[0]);
 					
-				if(typeof savevar.variables[name] != "undefined"){
-					return savevar.variables[name];
+				if(typeof savevar[name] != "undefined"){
+					return savevar[name];
 				}else{
+					if(typeof global.saveGlobal.variables[name] != "undefined"){
+						savevar[name] = global.createVar(getValue(global.saveGlobal.variables[name]));
+						return savevar[name];
+					}
 					global.errorOcured = true;
 					return dateCreator["IndexError"]("index '"+vars[0]+"' is undefined");
 				}
@@ -2489,102 +2842,188 @@ function var_type_function(){
 				var name = getValue(vars[0]);
 					
 				try{
+					//console.log("*****");
+					subacttype = vars[2];
+					
+					if(subacttype == "+=" || subacttype == "-="){
+						args[1] = vars[1];
+						if(subacttype == "+=")
+							actname = "_iadd";
+						else if(subacttype == "-=")
+							actname = "_isub";
+						
+						//console.log(subacttype);
+						//console.log(global.saveGlobal.variables[name]);
+						//console.log(args[1]);
+						
+						var err = global.saveGlobal.variables[name].func[actname](new Array(args[1]), global);
+						var number = getValue(global.saveGlobal.variables[name]);
+						//console.log("===>");
+						//console.log(global.createVar(number));
+						//console.log("<===");
+						savevar[name] = global.createVar(number);
+						if(this.errorOcured){
+							return err;
+						}
+						return;
+					}
+					
 					savevar[name] = vars[1];
-					global.variables[name] = vars[1];
-					return global.variables["true"];
+					global.saveGlobal.variables[name] = vars[1];
 				}catch(e){
 					global.errorOcured = true;
 					return dateCreator["IndexError"]("index '"+vars[0]+"' is undefined");
 				}
 			}
 			_global.func["type"] = function(vars, global){ return "object"; }
-		global.variables["$"] = _global;
+		global.variables["self"] = _global;
 		
 		var _local_pyr = new Pyr(global.terminal);
+		_local_pyr.isClass = global.isClass;
+		_local_pyr.isObject = global.isObject;
+		_local_pyr.subClass = global.subClass;
 		_local_pyr.variables = global.variables;
+		_local_pyr.saveGlobal = this.id.useClass;
 		
+		//console.log("***********************");
+		//console.log(_local_pyr);//5
+		//console.log(global);
+		//if(typeof useForFunctOtherPyr != "undefined")
+		//	console.log(useForFunctOtherPyr);//1
+		//console.log("***********************");
+		
+		var saved_for_use_in_this_pyr = useForFunctOtherPyr;
+		
+		//console.log(this.id.vars["code"]);
 		vratm = _local_pyr.compile(this.id.vars["code"], "", 0, 0, true);
+		//console.log("-----------");
+		//console.log(this.id.vars["name"]);
+		//console.log(vratm);
+		//console.log(_local_pyr);
+		//console.log(_local_pyr._parent);
+		//console.log(global);
+		//console.log("<<<<<-----------");
 		
+		//vratm = global.compile(this.id.vars["code"], "", 0, 0, true);
 		global.variables = $.extend( {}, savevar );
-		global._parent = _local_pyr;
-		
+		//global.variables = savevar;
+		if(typeof saved_for_use_in_this_pyr != "undefined" && saved_for_use_in_this_pyr != null){
+			saved_for_use_in_this_pyr._parent = _local_pyr;
+		}else
+			global._parent = _local_pyr;
+		//actualPyrInstance._parent = _local_pyr;
+		if(vratm == _local_pyr._TYPE_SYNC) vratm = global._TYPE_SYNC;
 		return vratm;
 	}
 	
 	return var_Tfunction;
 }
 
-/*
-DEFINE CLASS
-*/
+var useForFunctOtherPyr = null;
+/* OBJECT */
+function var_type_object(){
+	var var_Tobject = var_type();
+	var_Tobject.type = "object";
+	var_Tobject._parent = null;
+	var_Tobject._pyr_thread = null;
+	
+	var_Tobject.func["_init"] = function(vars, global){
+		this.id._parent = vars[0][0];
+		this.id.vars["name"] = vars[1];
+	}
+	var_Tobject.func["_string"] = function(vars, global){
+		return dateCreator["string"]("<object of "+this.id._parent.vars["name"]+">");
+	}
+	var_Tobject.func["_getattr"] = function(vars, global){
+		var name = getValue(vars[0]);
+		useForFunctOtherPyr = global;
+		//console.log("====>");
+		//console.log(useForFunctOtherPyr);
+		if(typeof this.id._pyr_thread.variables[name] != "undefined"){
+			return this.id._pyr_thread.variables[name];
+		}else{
+			if(typeof this.id._parent._pyr_thread.variables[name] != "undefined"){
+				return this.id._parent._pyr_thread.variables[name];
+			}
+			global.errorOcured = true;
+			return dateCreator["NameError"]("variable '"+this.id.vars["name"]+"."+vars[0]+"' is not defined");
+		}
+	}
+	var_Tobject.func["_setattr"] = function(vars, global){
+		var name = getValue(vars[0]);
+		try{
+			this.id._pyr_thread.variables[name] = vars[1];
+		}catch(e){
+			global.errorOcured = true;
+			return dateCreator["NameError"]("variable '"+this.id.vars["name"]+"."+vars[0]+"' is not defined");
+		}
+	}
+	return var_Tobject;
+}
+
+/* CLASS */
 function var_type_class(){
 	var var_Tclass = var_type();
 	var_Tclass.type = "class";
+	var_Tclass._pyr_thread = null;
 	
+	var_Tclass.func["_new"] = function(vars, global){
+		var variab = new dateCreator["object"](new Array(this.id, vars[0]), global);
+		//variab._pyr_thread = $.extend( {}, this.id._pyr_thread );
+		variab._pyr_thread = new Pyr(global.terminal);
+		variab._pyr_thread.files = global.files;
+		variab._pyr_thread.isClass = true;
+		variab._pyr_thread.isObject = true;
+		variab._pyr_thread.subClass = this.id._pyr_thread;
+		//global._parent = variab._pyr_thread;
+		
+		if(typeof this.id._pyr_thread.variables["_init"] != "undefined"){
+			var z = this.id._pyr_thread.variables["_init"].func["_call"](new Array(), variab._pyr_thread);
+			//if(z == variab._pyr_thread._TYPE_SYNC) return z;
+		}
+		return variab;
+	}
 	var_Tclass.func["_init"] = function(vars, global){
 		this.id.vars["name"] = vars[0][0];
 		this.id.vars["args"] = vars[0][1];
 		this.id.vars["code"] = vars[0][2];
+		this.id.vars["file"] = vars[0][3];
+		
+		this.id._pyr_thread = new Pyr(global.terminal);
+		this.id._pyr_thread.files = global.files;
+		this.id._pyr_thread.isClass = true;
+		this.id._pyr_thread.subClass = global;
+		
+		this.id._pyr_thread.compile(this.id.vars["code"], this.id.vars["file"]);
+	}
+	var_Tclass.func["_getattr"] = function(vars, global){
+		var name = getValue(vars[0]);
+		if(typeof this.id._pyr_thread.variables[name] != "undefined"){
+			return this.id._pyr_thread.variables[name];
+		}else{
+			global.errorOcured = true;
+			return dateCreator["NameError"]("variable '"+this.id.vars["name"]+"."+vars[0]+"' is not defined");
+		}
+	}
+	var_Tclass.func["_setattr"] = function(vars, global){
+		var name = getValue(vars[0]);
+		try{
+			this.id._pyr_thread.variables[name] = vars[1];
+			return global.variables["true"];
+		}catch(e){
+			global.errorOcured = true;
+			return dateCreator["NameError"]("variable '"+this.id.vars["name"]+"."+vars[0]+"' is not defined");
+		}
 	}
 	var_Tclass.func["_string"] = function(vars, global){
-		return dateCreator["string"]("<function "+this.id.vars["name"]+">");
+		return dateCreator["string"]("<class "+this.id.vars["name"]+">");
 	}
 	var_Tclass.func["_call"] = function(vars, global){
-		var savevar = $.extend( {}, global.variables );
-		
-		var _global = var_type();
-			_global.id = this.id;
-			_global.type = "object";
-			_global.func["_get"] = function(vars, global){
-				return this.id.vars["name"];
-			}
-			_global.func["_getitem"] = function(vars, global){  // [?]
-				vars[0] = getValue(vars[0]);
-				console.log(vars[0]);
-				console.log(savevar);
-				if(typeof savevar.variables[vars[0]] == "undefined"){
-					global.errorOcured = true;
-					return dateCreator["IndexError"]("index '"+vars[0]+"' is undefined");
-				}
-				return savevar.variables[vars[0]];
-			}
-			_global.func["_getattr"] = function(vars, global){
-				var name = getValue(vars[0]);
-					
-				if(typeof savevar.variables[name] != "undefined"){
-					return savevar.variables[name];
-				}else{
-					global.errorOcured = true;
-					return dateCreator["IndexError"]("index '"+vars[0]+"' is undefined");
-				}
-			}
-			_global.func["_setattr"] = function(vars, global){
-				var name = getValue(vars[0]);
-					
-				try{
-					savevar[name] = vars[1];
-					global.variables[name] = vars[1];
-					return global.variables["true"];
-				}catch(e){
-					global.errorOcured = true;
-					return dateCreator["IndexError"]("index '"+vars[0]+"' is undefined");
-				}
-			}
-			_global.func["type"] = function(vars, global){ return "object"; }
-		global.variables["$"] = _global;
-		
-		var _local_pyr = new Pyr(global.terminal);
-		_local_pyr.variables = global.variables;
-		
-		vratm = _local_pyr.compile(this.id.vars["code"], "", 0, 0, true);
-		
-		global.variables = $.extend( {}, savevar );
-		global._parent = _local_pyr;
-		
+
 		return vratm;
 	}
 	
-	return var_Tfunction;
+	return var_Tclass;
 }
 
 function getVal(vars, global){
@@ -2596,7 +3035,13 @@ function getVal(vars, global){
 	return vars;
 }
 
-function getValue(vars, type, global){
+function getValue(vars, type, global, calltime){
+	if(typeof calltime == "undefined") calltime = 1;
+	if(calltime > 100) return "Call time extended limit!";
+	if(typeof vars != "undefined" && typeof vars.isSync != "undefined") return "";
+	//if(typeof vars == "object" && typeof vars.value != "undefined")
+	//	console.log(vars.value);
+	
 	_return = vars;
 	_stop = false;
 	
@@ -2604,8 +3049,17 @@ function getValue(vars, type, global){
 		type = "string";
 	else if(type == "")
 		type = "string";
-	if(typeof vars == "undefined" || vars == "" || vars == null){
-		_return = new dateCreator["null"]();
+	
+	if(typeof vars == "object" && vars.type == "string" && type == "string")
+		return vars.vars["value"].value;
+	if(typeof vars == "object" && vars.type == "int" && type == "int")
+		return vars.vars["value"].value;
+	if(typeof vars == "number" && type == "int")
+		return vars;
+	
+	if((typeof vars == "undefined" || vars == "" || vars == null) && vars != 0){
+		//console.log(vars);
+		_return = dateCreator["null"]();
 		_stop = true;
 	}
 	else if(typeof vars != "object"){
@@ -2624,17 +3078,15 @@ function getValue(vars, type, global){
 	if(!_stop){
 		if(typeof vars.vars != "undefined"){
 			if(typeof vars.vars["value"] != "undefined"){
-				if(typeof vars.vars["value"].value != "undefined"){
-					var vl = ""+vars.vars["value"].value, noS = false, nvl = "";
-					for(i=0;i<vl.length;i++){ zn = vl.charAt(i);zq = vl.charAt(i+1); if(zn == "\\" && zq != "n" && zq != "r"){noS = true;}else if(zn == "\"" && noS == false){ }else{ nvl+=zn; } }
-					_return = nvl;
-				}
+				var vl = ""+vars.vars["value"].value, noS = false, nvl = "";
+				for(i=0;i<vl.length;i++){ zn = vl.charAt(i);zq = vl.charAt(i+1); if(zn == "\\" && zq != "n" && zq != "r"){noS = true;}else if(zn == "\"" && noS == false){ }else{ nvl+=zn; } }
+				_return = nvl;
 			}else if(typeof vars.func[jak] != "undefined"){
 				_return = vars.func[jak](new Array(), global);				
 			}
 		}else if(typeof vars.func == "undefined"){
 			if(typeof vars.value != "undefined")
-				_return = getValue(dateCreator[type](vars.value));			
+				_return = getValue(dateCreator[type](vars.value), type, global, ++calltime);			
 		}else if(typeof vars.func[jak] != "undefined"){
 			if(type == "string"){
 				_return = vars.func[jak](new Array(), global);
@@ -2645,7 +3097,7 @@ function getValue(vars, type, global){
 	if(typeof _return == "object"){
 		if(typeof _return.isError != "undefined")
 			return _return;
-		return getValue(_return, type, global);
+		return getValue(_return, type, global, ++calltime);
 	}
 	if(type == "int") _return = parseInt(_return);
 	if(type == "float") _return = parseFloat(_return);
@@ -2653,17 +3105,22 @@ function getValue(vars, type, global){
 }
 
 function getType(text){
-	if(typeof text == "object")
+	if(text != null && typeof text == "object")
 		return text.type;
-	var i = 0;
-	type = "int";
-	onlynumber = true;
 	
 	text = ""+text; //String it!
 	if(text == "") return "null";
 	
 	if(text.substring(0,1) == "\"")
 		return "string";
+	else if(!isNaN(text) && (""+text).indexOf(".") == -1)
+		return "int";
+	else if(!isNaN(text))
+		return "float";
+
+	var i = 0;
+	type = "int";
+	onlynumber = true;
 	
 	if(text.substr(text.length-1,1) == "]" && text.indexOf("[") != -1)
 		return "list";
@@ -2717,6 +3174,7 @@ dateType["list"]		= var_type_list;
 dateType["dictionary"]	= var_type_dictionary;
 dateType["function"]	= var_type_function;
 dateType["class"]		= var_type_class;
+dateType["object"]		= var_type_object;
 
 /*Canvas*/
 var PIXEL_RATIO = (function () {
@@ -2796,8 +3254,14 @@ dateType["Library"] = function(){
 	
 	var_Tlibrary.func["_init"] = function(vars, global){
 		this.id.librarc = library.length;
+		this.id.vars["name"] = new dateCreator["string"]("", global);
+		this.id.loaded = false;
 	}
-	var_Tlibrary.func["load"] = function(vars, global){
+	var_Tlibrary.func["isLoaded"] = function(vars, global){
+		if(this.id.functionJS != null) return global.variables["true"]; else return global.variables["false"];
+	}
+	var_Tlibrary.func["load"] = function(vars, global, compileId){
+		//console.log("=====>>> CODE >>>>");
 		window.open = window.open_;
 		this.id.librarc = library.length;
 		this.id.vars["name"] = vars[0];
@@ -2806,8 +3270,10 @@ dateType["Library"] = function(){
 		var can = true;
 		
 
+		//console.log("=====>>> CODE >>>>");
+		//console.log(global);
 		global._wait_finis = true;
-		var _lib_id_ = this.id, _global = global;
+		var _lib_id_ = this.id, _global = global, _compileId = compileId;
 		$.getScript( nameOfLibrary ).done(function( script, textStatus ) {
 			_lib_id_.vars["state"] = dateCreator["string"](textStatus, global);
 			var mn = nameOfLibrary.replace(".js","").toUpperCase();
@@ -2815,15 +3281,20 @@ dateType["Library"] = function(){
 			if(typeof window["__"+mn] != "undefined"){
 				//_global.func["print"](new Array(dateCreator["string"]("DEBUG: Success Loaded library "+mn,_global)));
 				_lib_id_.functionJS = new window["__"+mn]();
+				//console.log("LOADED");
 			}else{
 				//_global.func["print"](new Array(dateCreator["string"]("DEBUG: Failed Loaded library "+mn,_global)));
 			}
 			_global._wait_finis = false;
+			//console.log("STOP _wait_finis OKAY");
 		}).fail(function( jqxhr, settings, exception ) {
 			//_global.throwError(exception, 0, 0, "", "");
 			//_global.throwError("OSError: Can't import library \""+nameOfLibrary+"\"", 0, 0, "", "");
+			_global.errorOcured = true;
+			_global.compileError[_compileId] = true;
 			_global._save_last_error = dateCreator["IOError"]("Library \""+nameOfLibrary+"\" not a found!");
 			_global._wait_finis = false;
+			//console.log("STOP _wait_finis ERROR");
 		});
 		
 		return global._TYPE_SYNC;
@@ -2833,13 +3304,22 @@ dateType["Library"] = function(){
 		var nameOfFunction = getValue(vars[0]);
 		try{
 			var uarr = new Array();
+			//console.log("********");
+			//console.log(_async_variable_set_name_is);
 			for (index = 1; index < vars.length; index++) {
-				uarr[index-1] = getValue(vars[index]);
+				if(vars[index].type != "function")
+					uarr[index-1] = getValue(vars[index]);
+				else
+					uarr[index-1] = vars[index];
 			}
-			var exui = this.id.functionJS[nameOfFunction](uarr);
+			//console.log(this.id.functionJS);
+			//console.log(uarr);
+			var exui = this.id.functionJS[nameOfFunction](uarr, global);
+			//console.log(exui);
 			if(exui == null){
 				return dateCreator["null"]("", global);
 			}else if(typeof exui == "object"){
+				//console.log("<---- OBJECT");
 				return exui;
 			}else if(typeof exui == "string"){
 				return dateCreator["string"](exui, global);
@@ -2847,8 +3327,8 @@ dateType["Library"] = function(){
 				return dateCreator["int"](exui, global);
 			}
 		}catch(e){
-			console.log(e);
 			global.errorOcured = true;
+			console.log(e);
 			return dateCreator["JSError"](e);
 		}
 		//return new PValue(this.id.librarc);
@@ -2877,6 +3357,8 @@ dateCreator["list"] 	 = function(value, global){ 	var vars = dateType["list"]();
 dateCreator["dictionary"]= function(value, global){ 	var vars = dateType["dictionary"]();args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
 dateCreator["function"]  = function(value, global){ 	var vars = dateType["function"](); 	args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
 dateCreator["class"] 	 = function(value, global){ 	var vars = dateType["class"](); 	args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
+dateCreator["object"] 	 = function(value, global){ 	var vars = dateType["object"](); 	args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
+
 dateCreator["Canvas"] 	 = function(value, global){ 	var vars = dateType["Canvas"](); 	args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
 dateCreator["Library"] 	 = function(value, global){ 	var vars = dateType["Library"](); 	args = new Array();args[0] = value;		vars.func["_init"](args, global); 	return vars; }
 //Errors
